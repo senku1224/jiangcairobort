@@ -4,8 +4,9 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { parseCommand, handleCommand, normalize } = require('../bot/commands.cjs');
+const { parseCommand, handleCommand, normalize, looksLikeCode } = require('../bot/commands.cjs');
 const { createReader, formatQuestList } = require('../bot/supabase-rest.cjs');
+const { stripPlainMention } = require('../bot/onebot.cjs');
 
 test('normalize 去掉前缀与首尾空白', () => {
   assert.equal(normalize('  /招募  ', '/'), '招募');
@@ -188,4 +189,54 @@ test('listOpenQuestsSafe 无缓存且网络失败时抛错（不假装成功）'
   const reader = createReader('https://127.0.0.1:9/', 'test-key', { cachePath: path.join(dir, 'none.json'), retries: 1 });
   await assert.rejects(() => reader.listOpenQuestsSafe());
   fs.rmSync(dir, { recursive: true, force: true });
+});
+
+/* ── 手滑也要能用：@机器人 发码 / 不加空格 / 全角 ───────────── */
+
+test('normalize 归一化全角数字与全角斜杠', () => {
+  assert.equal(normalize('／绑定１２３４５６', ''), '绑定123456');
+});
+
+test('parseCommand 支持中文指令不加空格', () => {
+  assert.equal(parseCommand('绑定586203', '').name, 'bind');
+  assert.deepEqual(parseCommand('绑定586203', '').args, ['586203']);
+  assert.equal(parseCommand('/报名1', '').name, 'join');
+  assert.deepEqual(parseCommand('/报名1', '').args, ['1']);
+  assert.deepEqual(parseCommand('取消报名1', '').args, ['1']);
+});
+
+test('stripPlainMention 去掉手机端当文本发出的 @昵称', () => {
+  assert.equal(stripPlainMention('@臼井 /绑定586203'), '/绑定586203');
+  assert.equal(stripPlainMention('@臼井 586203'), '586203');
+  assert.equal(stripPlainMention('/招募'), '/招募');
+});
+
+test('looksLikeCode 只认 6 位数字', () => {
+  assert.equal(looksLikeCode('586203'), true);
+  assert.equal(looksLikeCode('58620'), false);
+  assert.equal(looksLikeCode('58 6203'), false);
+});
+
+test('只 @机器人 + 6 位码 视为绑定', async () => {
+  let used = null;
+  const deps = {
+    reader: {}, siteUrl: '',
+    writer: { bindByCode: async (code, qq) => { used = { code, qq }; return { ok: true }; } }
+  };
+  const result = await handleCommand('586203', deps, '', { qq: '10001', mentioned: true });
+  assert.equal(result.handled, true);
+  assert.deepEqual(used, { code: '586203', qq: '10001' });
+});
+
+test('没被 @ 时单纯发数字不触发绑定（避免误伤普通聊天）', async () => {
+  const deps = { reader: {}, writer: { bindByCode: async () => ({ ok: true }) }, siteUrl: '' };
+  const result = await handleCommand('586203', deps, '', { qq: '10001', mentioned: false });
+  assert.equal(result.handled, false);
+});
+
+test('认不出的指令返回 unknown，交给上层决定是否提示', async () => {
+  const deps = { reader: {}, writer: {}, siteUrl: '' };
+  const result = await handleCommand('随便说点什么', deps, '', { qq: '1', mentioned: true });
+  assert.equal(result.handled, false);
+  assert.equal(result.unknown, true);
 });

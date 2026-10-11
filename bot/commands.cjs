@@ -27,9 +27,29 @@ const NEED_KEY = '这个功能需要写入密钥（service key）才能用。请
 
 function normalize(text, prefix) {
   let value = String(text || '').trim();
+  // 全角数字 / 全角斜杠 先归一化，避免「／绑定１２３４５６」这类输入失败
+  value = value
+    .replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0))
+    .replace(/[／]/g, '/');
   if (prefix && value.startsWith(prefix)) value = value.slice(prefix.length).trim();
   if (value.startsWith('/')) value = value.slice(1).trim();
   return value;
+}
+
+// 中文指令允许不加空格，例如「绑定586203」「报名1」「取消报名1」。
+// 为避免误伤普通聊天，只接受「中文别名 + 纯数字」这种紧挨着的写法。
+function splitByAlias(head) {
+  let best = null;
+  for (const [key, aliases] of Object.entries(COMMANDS)) {
+    for (const alias of aliases) {
+      if (!/^[\u4e00-\u9fa5]+$/.test(alias) || alias.length < 2) continue;
+      if (!head.startsWith(alias)) continue;
+      const rest = head.slice(alias.length);
+      if (!/^\d+$/.test(rest)) continue;
+      if (!best || alias.length > best.alias.length) best = { name: key, alias, rest };
+    }
+  }
+  return best ? { name: best.name, args: [best.rest] } : null;
 }
 
 function parseCommand(text, prefix) {
@@ -42,7 +62,14 @@ function parseCommand(text, prefix) {
       return { name: key, args: rest, raw: value };
     }
   }
+  const merged = splitByAlias(head);
+  if (merged) return { name: merged.name, args: [...merged.args, ...rest], raw: value };
   return { name: 'unknown', args: [], raw: value };
+}
+
+// 用户只 @了机器人、后面直接跟 6 位绑定码时，也当成 /绑定
+function looksLikeCode(value) {
+  return /^\d{6}$/.test(String(value || '').trim());
 }
 
 function helpText(siteUrl) {
@@ -107,8 +134,13 @@ function formatMine(mine, siteUrl) {
 
 // 只有被明确触发的指令才回复；普通聊天不打扰
 async function handleCommand(text, deps, prefix, context = {}) {
-  const parsed = parseCommand(text, prefix);
-  if (!parsed || parsed.name === 'unknown') return { handled: false };
+  let parsed = parseCommand(text, prefix);
+  // 只 @了机器人、后面直接跟 6 位码：也当成 /绑定（很多人会这么发）
+  if (parsed && parsed.name === 'unknown' && context.mentioned && looksLikeCode(parsed.raw)) {
+    parsed = { name: 'bind', args: [String(parsed.raw).trim()], raw: parsed.raw };
+  }
+  if (!parsed) return { handled: false };
+  if (parsed.name === 'unknown') return { handled: false, unknown: true };
   const reply = message => ({ handled: true, reply: message });
 
   switch (parsed.name) {
@@ -182,4 +214,4 @@ async function handleCommand(text, deps, prefix, context = {}) {
   }
 }
 
-module.exports = { parseCommand, handleCommand, helpText, normalize, COMMANDS, DEFAULT_NICKNAME };
+module.exports = { parseCommand, handleCommand, helpText, normalize, looksLikeCode, COMMANDS, DEFAULT_NICKNAME };

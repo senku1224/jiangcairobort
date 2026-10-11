@@ -9,7 +9,7 @@
 'use strict';
 
 const { config, isGroupAllowed } = require('./config.cjs');
-const { startEventServer, reply, replyPrivate, extractText, isMentioned, log } = require('./onebot.cjs');
+const { startEventServer, reply, replyPrivate, extractText, isMentioned, stripPlainMention, log } = require('./onebot.cjs');
 const { createReader, createWriter } = require('./supabase-rest.cjs');
 const { handleCommand } = require('./commands.cjs');
 
@@ -28,32 +28,47 @@ function stripTriggers(text) {
 
 async function onEvent(event) {
   if (!event || event.post_type !== 'message') return;
-  const text = extractText(event);
+  const raw = extractText(event);
+  if (!raw) return;
+  // 手机端可能把「@昵称」当普通文本发出，这里先去掉，便于按指令解析
+  const text = stripPlainMention(raw);
   if (!text) return;
 
   const isGroup = event.message_type === 'group';
+  const mentioned = isMentioned(event, event.self_id) || /^@/.test(raw);
+  const slashy = /^[\/／]/.test(text) || (config.commandPrefix && text.startsWith(config.commandPrefix));
   if (isGroup) {
     if (!isGroupAllowed(event.group_id)) return;
-    const triggered = isMentioned(event, event.self_id) || text.startsWith('/') || (config.commandPrefix && text.startsWith(config.commandPrefix));
-    if (!triggered) return;
+    if (!mentioned && !slashy) return;
   }
+  // 私聊：允许直接发「招募」「绑定 123456」这类松散写法；
+  // 认不出的内容不会回复（下面的提示只在被 @ 或带 / 时触发）。
 
   const content = stripTriggers(text);
   const context = {
     scopeId: isGroup ? String(event.group_id) : `private-${event.user_id}`,
     qq: event.user_id ? String(event.user_id) : '',
     nickname: (event.sender && (event.sender.card || event.sender.nickname)) || '',
-    isGroup
+    isGroup,
+    mentioned
   };
   const result = await handleCommand(content, deps, config.commandPrefix, context);
-  if (!result.handled || !result.reply) return;
+  let answer = result.handled ? result.reply : '';
+  if (!answer && result.unknown && (mentioned || slashy)) {
+    answer = [
+      '没认出这条指令，发 /帮助 看看我能做什么。',
+      '常用：/招募 看列表 · /报名 <序号> · /我的 · /网站',
+      '绑定身份：到网站「冒险者名片」点「生成绑定码」，再发 /绑定 <6位码>。'
+    ].join('\n');
+  }
+  if (!answer) return;
 
   try {
     if (isGroup) {
-      await reply({ api: config.onebotApi, token: config.onebotToken }, event.group_id, result.reply);
+      await reply({ api: config.onebotApi, token: config.onebotToken }, event.group_id, answer);
       log(`群 ${event.group_id} 回复「${content}」`);
     } else {
-      await replyPrivate({ api: config.onebotApi, token: config.onebotToken }, event.user_id, result.reply);
+      await replyPrivate({ api: config.onebotApi, token: config.onebotToken }, event.user_id, answer);
       log(`私聊 ${event.user_id} 回复「${content}」`);
     }
   } catch (error) {

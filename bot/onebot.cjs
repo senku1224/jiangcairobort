@@ -71,9 +71,15 @@ const isMentioned = (event, selfId) =>
   (Array.isArray(event.message) ? event.message : [])
     .some(segment => segment.type === 'at' && String(segment.data?.qq) === String(selfId));
 
+// 手机端有时会把「@某人」当普通文本发出来（没有 at 消息段）。
+// 这里把开头的 @名字 去掉，方便后续按指令解析。
+function stripPlainMention(text) {
+  return String(text || '').replace(/^@[^\s@]{1,24}\s*/, '').trim();
+}
+
 function log(message) {
   const stamp = new Date().toLocaleString('zh-CN', { hour12: false });
   console.log(`[${stamp}] ${message}`);
 }
 
-module.exports = { startEventServer, callApi, reply, replyPrivate, extractText, isMentioned, log };
+module.exports = { startEventServer, callApi, reply, replyPrivate, extractText, isMentioned, stripPlainMention, log };
