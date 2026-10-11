@@ -88,7 +88,7 @@ async function main() {
   await command('Runtime.enable');
   await command('Page.enable');
   await command('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1100, deviceScaleFactor: 1, mobile: false });
-  await command('Page.navigate', { url: `http://127.0.0.1:${port}` });
+  await command('Page.navigate', { url: `http://127.0.0.1:${port}/?backend=local` });
   await until(() => evaluate('document.querySelectorAll(".quest-card").length === 6'), '首页示例委托');
   assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'), true);
   assert.equal(await evaluate('document.querySelector("#fatal-error").hidden'), true);
@@ -182,7 +182,7 @@ async function main() {
   console.log('PASS 取消委托、清除示例保留自建数据、刷新不恢复示例');
 
   await evaluate('localStorage.removeItem(GuildData.STORAGE_KEY)');
-  await command('Page.navigate', { url: `http://127.0.0.1:${port}/?mobile=1#hall` });
+  await command('Page.navigate', { url: `http://127.0.0.1:${port}/?backend=local&mobile=1#hall` });
   await until(() => evaluate('document.querySelectorAll(".quest-card").length === 6 && document.querySelector("#hall-hero").hidden === false'), '新演示供手机截图');
   for (const width of [390, 320, 768]) {
     await command('Emulation.setDeviceMetricsOverride', { width, height: 844, deviceScaleFactor: 1, mobile: true });

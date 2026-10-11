@@ -9,6 +9,7 @@
   let detailId = null;
   let confirmation = null;
   let revision = 0;
+  let backendMode = 'local';
 
   UI.hydrateIcons();
   const form = select('#create-form');
@@ -27,6 +28,22 @@
   function showError(element, message) {
     element.textContent = message;
     element.hidden = !message;
+  }
+  function applyBackendMode(backend) {
+    backendMode = backend.mode;
+    document.body.dataset.backend = backend.mode;
+    const shared = backend.mode === 'supabase';
+    const badge = select('.local-badge');
+    if (badge) badge.innerHTML = shared ? '<i></i> 共享公会已连接' : '<i></i> 本地演示版';
+    const identityNote = select('.sidebar-user small');
+    if (identityNote) identityNote.innerHTML = shared ? '<i class="online-dot"></i> 共享身份 · 未登录' : '<i class="online-dot"></i> 本地演示身份';
+    const footerMode = select('[data-mode-label]');
+    if (footerMode) footerMode.textContent = shared ? '共享公会' : '本地演示';
+    const nicknameHint = select('#nickname-hint');
+    if (nicknameHint) nicknameHint.textContent = shared
+      ? '发布后会同步到共享公会，群友都能看到这份委托。'
+      : '这是本地演示昵称，修改后会同步更新你的已有委托与报名。';
+    if (!shared && backend.reason && backend.reason.startsWith('共享数据库连接失败')) toast(backend.reason, true);
   }
   function openDialog(element) {
     element.showModal();
@@ -174,9 +191,13 @@
 
   function showInfo(kind) {
     select('#info-title').textContent = kind === 'guide' ? '冒险者指南' : '关于酱菜公会';
-    select('#info-content').innerHTML = kind === 'guide'
-      ? '<div class="guide-step"><b>01</b><div><h3>挑一份心动的委托</h3><p>按游戏、日期、状态搜索，确认时间、语音要求与剩余名额。</p></div></div><div class="guide-step"><b>02</b><div><h3>报名，和队友准时碰头</h3><p>点击「报名参加」加入。行程改变时，可以在开场前取消报名；发布者同样可以退出自己的队伍。</p></div></div><div class="guide-step"><b>03</b><div><h3>没有合适的？自己发起！</h3><p>点击「发布冒险委托」，选择预设游戏或输入自定义游戏名。人数是队伍总人数，可选择是否占用一个名额。</p></div></div><div class="identity-note">开场前一小时显示「即将开始」；满员优先显示「已满员」；到开场时间自动结束招募。「已结束」仅表示招募截止，不代表游戏已经结束。</div><p>守时、友善、尊重队友。不会玩没关系，开心最重要。</p>'
-      : '<h3>酱菜多人联机区的温暖据点</h3><p>这是为 QQ 群友准备的 Steam 开黑招募面板。公会精神很简单：游戏可以输，队友不能丢。</p><div class="identity-note"><strong>当前为本地演示</strong><p>身份和招募只保存在当前浏览器、当前站点。没有接入 QQ 登录、消息通知或共享数据库；同名昵称不等于同一个人。</p><p>清除浏览器数据、更换设备或更换打开地址后，原数据不会自动跟随。请使用页脚「导出数据」保留备份。</p></div><p>多人真实使用需要后端数据库与可靠身份认证。未来 QQ 机器人交互将依据实际接口权限实现。</p>';
+    if (kind === 'guide') {
+      select('#info-content').innerHTML = '<div class="guide-step"><b>01</b><div><h3>挑一份心动的委托</h3><p>按游戏、日期、状态搜索，确认时间、语音要求与剩余名额。</p></div></div><div class="guide-step"><b>02</b><div><h3>报名，和队友准时碰头</h3><p>点击「报名参加」加入。行程改变时，可以在开场前取消报名；发布者同样可以退出自己的队伍。</p></div></div><div class="guide-step"><b>03</b><div><h3>没有合适的？自己发起！</h3><p>点击「发布冒险委托」，选择预设游戏或输入自定义游戏名。人数是队伍总人数，可选择是否占用一个名额。</p></div></div><div class="identity-note">开场前一小时显示「即将开始」；满员优先显示「已满员」；到开场时间自动结束招募。「已结束」仅表示招募截止，不代表游戏已经结束。</div><p>守时、友善、尊重队友。不会玩没关系，开心最重要。</p>';
+    } else if (backendMode === 'supabase') {
+      select('#info-content').innerHTML = '<h3>酱菜多人联机区的温暖据点</h3><p>这是为 QQ 群友准备的 Steam 开黑招募面板。招募与报名已存入共享数据库，群里任何人都能看到同一份公告板。</p><div class="identity-note"><strong>共享数据库已连接（但尚未登录）</strong><p>当前身份只是本浏览器里的随机标识，还没有接入 QQ 登录；同名昵称不等于同一个人，也无法保证「只有本人能修改自己的记录」。</p><p>请不要在委托里填写隐私信息。真正的权限控制要等接入账号身份后才会生效。</p></div><p>未来 QQ 机器人交互将依据实际接口权限实现。</p>';
+    } else {
+      select('#info-content').innerHTML = '<h3>酱菜多人联机区的温暖据点</h3><p>这是为 QQ 群友准备的 Steam 开黑招募面板。公会精神很简单：游戏可以输，队友不能丢。</p><div class="identity-note"><strong>当前为本地演示</strong><p>身份和招募只保存在当前浏览器、当前站点。没有接入 QQ 登录、消息通知或共享数据库；同名昵称不等于同一个人。</p><p>清除浏览器数据、更换设备或更换打开地址后，原数据不会自动跟随。请使用页脚「导出数据」保留备份。</p></div><p>多人真实使用需要后端数据库与可靠身份认证。未来 QQ 机器人交互将依据实际接口权限实现。</p>';
+    }
     openDialog(select('#info-dialog'));
   }
 
@@ -282,8 +303,11 @@
   });
 
   try {
-    service = GuildData.createService(window.localStorage);
-    await service.init();
+    const backend = await GuildBackend.createGuildService({
+      config: window.GUILD_CONFIG, storage: window.localStorage, location: window.location
+    });
+    service = backend.service;
+    applyBackendMode(backend);
     await refresh();
     route();
     setInterval(() => {

@@ -5,7 +5,7 @@ const path = require('node:path');
 const root = __dirname;
 const port = Number(process.env.PORT || 4173);
 const types = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml', '.json': 'application/json; charset=utf-8' };
-const allowed = new Set(['index.html', 'css/style.css', 'js/data.js', 'js/ui.js', 'js/app.js', 'assets/guild-map.svg']);
+const allowed = new Set(['index.html', 'css/style.css', 'js/config.js', 'js/data.js', 'js/supabase-store.js', 'js/backend.js', 'js/ui.js', 'js/app.js', 'vendor/supabase-js.umd.js', 'assets/guild-map.svg']);
 
 http.createServer(async (request, response) => {
   try {

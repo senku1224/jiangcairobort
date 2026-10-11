@@ -12,6 +12,8 @@ npm start
 
 浏览器打开 **http://localhost:4173**。无需执行 `npm install`。保持终端运行，按 `Ctrl+C` 停止服务。`server.cjs` 只是本机静态文件服务，不是共享数据后端，默认只监听 `127.0.0.1`。
 
+页面默认会尝试连接共享数据库（见「共享数据库（Supabase）」）。连接失败时会自动回退到本地演示模式，并在界面给出提示，不会假装已经连上。地址加 `?backend=local` 可强制使用本地模式。
+
 也可以直接双击 `index.html` 体验；部分浏览器限制 `file://` 的持久化与跨标签页协调，因此推荐使用上面的本地服务。双击打开和本地服务不是同一存储空间；端口或域名变更也会使用不同的存储空间。
 
 ## 页面结构与已实现功能
@@ -42,7 +44,7 @@ npm start
 
 ## 数据模型
 
-存储键：`jiangcai.guild.v1`，一个 JSON 文档保存身份和全部委托，避免分多次写入留下不一致状态。
+**本地模式**的存储键：`jiangcai.guild.v1`，一个 JSON 文档保存身份和全部委托，避免分多次写入留下不一致状态。**共享模式**下，这些字段映射到 `quests` 与 `quest_members` 两张表（见「共享数据库（Supabase）」）。
 
 ```js
 {
@@ -72,15 +74,20 @@ npm start
 index.html              页面、筛选器与表单
 css/style.css           统一主题、响应式布局、交互反馈
 assets/guild-map.svg    原创公会营地插画
-js/data.js              数据模型、校验、状态计算、持久化适配器
+js/config.js            公开配置（Supabase URL + publishable key）
+js/data.js              本地模式数据模型、校验、状态计算、localStorage 适配器
+js/supabase-store.js    Supabase 共享数据服务（与本地服务同接口）
+js/backend.js           后端选择：共享优先，失败回退本地
+vendor/supabase-js.umd.js  本地内置的 Supabase 客户端（离线可用）
 js/ui.js                卡片、插画、详情与纯筛选函数
 js/app.js               路由、表单、弹窗、事件协调
 server.cjs              零依赖本地静态服务器
+supabase/schema.sql     数据表、触发器与 RLS 策略
 tests/data.test.cjs     数据规则与筛选回归测试
 tests/browser.cjs       Chrome 浏览器交互与响应式检查
 ```
 
-`GuildData.createService(storage)` 返回异步接口：`init()`、`snapshot()`、`updateNickname()`、`createQuest()`、`joinQuest()`、`leaveQuest()`、`finishQuest()`、`clearDemo()`、`exportData()`。界面通过这些方法操作数据。未来可更换 `app.js` 中的服务实例，保留接口形状，替换成本项目实际实现的后端请求；当前没有虚构的远程接口地址。
+`GuildData.createService(storage)` 返回异步接口：`init()`、`snapshot()`、`updateNickname()`、`createQuest()`、`joinQuest()`、`leaveQuest()`、`finishQuest()`、`clearDemo()`、`exportData()`。`GuildSupabase.createSupabaseService(client, storage)` 提供**完全相同**的接口，`js/backend.js` 负责二选一，界面层不需要关心用的是哪一个。两份实现都在数据层复核输入、容量与状态规则；所有进入 HTML 的用户文字都经过转义。
 
 ## 验证
 
@@ -94,15 +101,38 @@ npm run test:browser
 
 建议手动体验：发布自定义游戏 → 查看详情 → 取消报名 → 重新报名 → 改昵称 → 刷新 → 在我的冒险结束委托 → 筛选已结束 → 清除示例 → 再次刷新确认不会恢复。
 
-## 当前边界与未来接入
+## 共享数据库（Supabase）
 
-**localStorage 只保存此浏览器、此站点的数据，不能让群友共享报名。** 当前昵称属于演示身份，尚未接入 QQ 登录，不能作为真正的权限安全机制。个人可通过浏览器工具修改本地数据。
+项目已接入 Supabase：招募与报名数据存放在共享数据库，群友看到的是**同一份**公告板。
 
-真实多人使用时，后端应负责数据库持久化、可信身份识别、发布者授权、事务式名额控制、防止重复报名及统一时间校验。前端继续负责展示、输入与操作反馈。共享服务器必须重新实现校验，不能信任浏览器传入的用户 ID 或人数。
+- 公开配置在 `js/config.js`（Project URL + publishable key）。publishable key 本就是给浏览器用的公开密钥，**不要**在这里放 secret / service_role key。
+- 数据表结构在 `supabase/schema.sql`。首次使用需在 Supabase 控制台 → SQL Editor 里整段执行一次（可重复执行，不会删除已有数据）。
+- 表：`quests`（招募）与 `quest_members`（报名），含主键、外键关联（报名 → 委托，级联删除）、创建时间、招募状态、人数上限、语音要求、备注、示例标记等字段。约束保证人数为 1–32、状态只能取合法值。
+- 触发器 `enforce_member_rules` 在数据库层再校验一次「委托是否已截止 / 是否已满员」，防止绕过前端造成超员或给已截止委托报名。
+- 客户端库已内置在 `vendor/supabase-js.umd.js`，因此仍然**不需要** `npm install`，也能离线打开本地模式。
+- 连接失败（未建表 / 网络不通）时自动回退到本地演示模式，并在界面给出明确提示，**不会假装已连上**。
 
-现代浏览器在 HTTP 同源多标签页中通过 Web Locks 串行处理本地修改，并通过 `storage` 事件刷新其他标签页。浏览器不支持 Web Locks 或直接打开文件时，仅保证单标签页演示流程，不承诺跨窗口并发一致性。
+**localStorage 现在只用于：** 本地模式下的完整演示数据、浏览器内的身份标识，以及界面状态。共享模式下，跨浏览器的业务数据一律以数据库为准。
 
-未来 QQ 机器人可经由实际后端创建或查询招募、报名和取消报名；QQ 登录、机器人消息、群号绑定、群菜单、分享卡片和通知均**尚未实现**，能否采用按钮交互取决于实际取得的接口权限。
+## 身份与权限（重要）
+
+**目前没有登录，也没有可靠的用户身份认证。** 身份只是每个浏览器本地生成的一个随机 ID（`jiangcai.guild.identity.v1`），可以被人为修改。因此：
+
+- 匿名（所有访问者）**可以**：查看公告板、发布委托、报名、取消报名、结束或取消自己发起的委托。
+- 数据库已开启 Row Level Security，并做了力所能及的收口：
+  - `quests`：允许读和发布；修改时只允许状态字段取合法值；**删除只对 `is_demo = true` 的示例委托开放**，真实委托无法被匿名删除。
+  - `quest_members`：允许读、报名、取消报名、同步昵称。
+- **无法被安全保证的部分**（不假装已实现）：数据库无法判断「这条记录是不是本人写的」，理论上仍有人能改动或删除他人的报名、他人委托的状态。要做到「只有本人能改自己的记录」，必须先有可信身份。
+- 现在的权限定位是「防误伤 + 防超员」，**不是**「防恶意」。
+
+## 后续步骤
+
+1. **建表**：在 Supabase SQL Editor 运行一次 `supabase/schema.sql`。
+2. **用户身份**：接入 Supabase Auth 或 QQ 登录，让身份可验证；之后再按 `auth.uid()` 收紧 RLS，实现「只能改自己的记录」。
+3. **公开部署**：把静态站点部署到支持 HTTPS 的托管；`server.cjs` 仅用于本地开发。
+4. **QQ 机器人**：**尚未接入**。群消息通知、按钮交互等都需要真实后端 + 机器人接口权限，届时应经由后端读写数据库，而不是让前端直连；在此之前不要声称机器人已经工作。
+
+现代浏览器在 HTTP 同源多标签页中通过 Web Locks 串行处理本地修改，并通过 `storage` 事件刷新其他标签页。共享模式下由 15 秒轮询与页面重新可见时的刷新保证数据新鲜度。
 
 ## 存储故障排查
 

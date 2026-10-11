@@ -8,8 +8,12 @@
   <title>酱菜冒险者公会 · 一起开黑吧</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%23914836'/%3E%3Ctext x='32' y='44' font-size='40' text-anchor='middle' fill='%23fff1d2'%3E酱%3C/text%3E%3C/svg%3E">
   <link rel="stylesheet" href="css/style.css">
+  <script src="js/config.js"></script>
+  <script defer src="vendor/supabase-js.umd.js"></script>
   <script defer src="js/data.js"></script>
+  <script defer src="js/supabase-store.js"></script>
   <script defer src="js/ui.js"></script>
+  <script defer src="js/backend.js"></script>
   <script defer src="js/app.js"></script>
 </head>
 <body>
@@ -69,7 +73,7 @@
           <div class="rail-decoration">✦ <span>GOOD GAMES. GOOD COMPANY.</span> ✦</div>
         </aside>
       </div>
-      <footer><span><b>酱菜冒险者公会</b> · 为每一场快乐开黑而生</span><span>本地演示 · 时间均为北京时间 <button class="text-button" data-action="export">导出数据</button></span></footer>
+      <footer><span><b>酱菜冒险者公会</b> · 为每一场快乐开黑而生</span><span><b data-mode-label>本地演示</b> · 时间均为北京时间 <button class="text-button" data-action="export">导出数据</button></span></footer>
     </main>
   </div>
 
@@ -82,7 +86,7 @@
         <p class="field-tip">时间均为北京时间（UTC+8），到点后自动结束招募。</p>
         <div class="form-row"><label>队伍总人数 <em>*</em><input name="capacity" type="number" min="1" max="32" step="1" value="4" required></label><label>语音要求 <em>*</em><select name="voice"><option value="any">不限，开心就好</option><option value="required">需要语音</option><option value="none">不使用语音</option></select></label></div>
         <label class="check-label creator-check"><input name="includeCreator" type="checkbox" checked>我也参加，占用一个队伍名额</label>
-        <label>发布者昵称 <em>*</em><input name="nickname" required maxlength="20" placeholder="队友该怎么称呼你？"><small>这是本地演示昵称，修改后会同步更新你的已有委托与报名。</small></label>
+        <label>发布者昵称 <em>*</em><input name="nickname" required maxlength="20" placeholder="队友该怎么称呼你？"><small id="nickname-hint">这是本地演示昵称，修改后会同步更新你的已有委托与报名。</small></label>
         <label>委托备注 <span class="optional">选填</span><textarea name="note" maxlength="500" rows="3" placeholder="说说玩法、难度、游戏进度，以及是否欢迎萌新…"></textarea></label>
         <p id="create-error" class="form-error" role="alert" hidden></p>
       </div><div class="dialog-footer"><button class="button subtle" type="button" data-dismiss>再想想</button><button type="submit" class="button primary"><span data-icon="plus"></span>确认发布委托</button></div>
