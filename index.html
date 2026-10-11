@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f6f3eb">
+  <meta name="description" content="酱菜冒险者公会，Steam 多人联机与开黑招募中心。找队友、发委托，一起开启下一场冒险。">
+  <title>酱菜冒险者公会 · 一起开黑吧</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%23914836'/%3E%3Ctext x='32' y='44' font-size='40' text-anchor='middle' fill='%23fff1d2'%3E酱%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="css/style.css">
+  <script defer src="js/data.js"></script>
+  <script defer src="js/ui.js"></script>
+  <script defer src="js/app.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">跳转到主要内容</a>
+  <aside class="sidebar">
+    <a class="brand" href="#hall" aria-label="酱菜冒险者公会首页"><span class="brand-mark">酱<span>✦</span></span><span><strong>酱菜冒险者公会</strong><small>JIANGCAI ADVENTURERS GUILD</small></span></a>
+    <div class="sidebar-caption">冒险，从这里开始</div>
+    <nav class="main-nav" aria-label="主导航">
+      <a href="#hall" data-page="hall"><span data-icon="home"></span>公会大厅<span class="nav-dot"></span></a>
+      <a href="#quests" data-page="quests"><span data-icon="board"></span>委托看板<span class="nav-count" id="nav-count">0</span></a>
+      <a href="#mine" data-page="mine"><span data-icon="backpack"></span>我的冒险</a>
+    </nav>
+    <div class="sidebar-divider"></div>
+    <div class="sidebar-caption">公会小册子</div>
+    <button class="nav-button" data-action="guide"><span data-icon="book"></span>冒险者指南<span class="small-arrow">↗</span></button>
+    <button class="nav-button" data-action="about"><span data-icon="shield"></span>关于酱菜公会</button>
+    <div class="sidebar-note"><span class="little-star">✧</span><strong>一个人走得快，<br>一群人走得更快乐。</strong><p>今晚的快乐，就差一个你。</p><span class="note-line"></span><small>酱菜多人联机区 · QQ 群</small></div>
+    <button class="sidebar-user" data-action="profile"><span class="avatar user-initial">酱</span><span><strong class="user-name">酱菜见习生</strong><small><i class="online-dot"></i> 本地演示身份</small></span><span data-icon="settings"></span></button>
+  </aside>
+
+  <div class="app-shell">
+    <header class="topbar"><div class="breadcrumb">酱菜多人联机区 <span>/</span> <strong id="breadcrumb-current">公会大厅</strong></div><div class="topbar-right"><span class="local-badge"><i></i> 本地演示版</span><button class="avatar small user-initial" data-action="profile" aria-label="编辑我的昵称">酱</button></div></header>
+    <main id="main">
+      <div id="fatal-error" class="fatal-error" role="alert" hidden></div>
+      <section class="page-heading"><div><div class="eyebrow">THE ADVENTURE STARTS HERE</div><h1 id="page-title">公会大厅<span class="title-sparkle">✧</span></h1><p id="page-subtitle">欢迎回来，冒险者。今天准备和谁一起拯救世界？</p></div><button class="button primary" data-action="create"><span data-icon="plus"></span>发布冒险委托</button></section>
+
+      <section class="hero" id="hall-hero" aria-labelledby="hero-title">
+        <div class="hero-copy"><span class="hero-tag"><span>✦</span> 酱菜公会 · 集结号</span><h2 id="hero-title">世界很大，<br>开黑要一起。</h2><p>Steam 多人联机与开黑招募中心<br>缺一个队友？来这里，找到你的冒险搭子。</p><a class="button cream" href="#quests">浏览全部委托 <span data-icon="arrow"></span></a><div class="hero-footnote"><span class="hero-avatars"><b>酱</b><b>菜</b><b>友</b></span><span>新手友好 · 快乐优先 · 拒绝压力</span></div></div>
+        <img src="assets/guild-map.svg" class="hero-art" alt="暖色奇幻山谷中的公会小屋、蜿蜒山路与远方城堡">
+        <span class="hero-coordinate">GUILD CAMP / 01</span>
+      </section>
+
+      <section class="stats-row" aria-label="公会招募概况" id="stats-row"></section>
+
+      <div class="content-layout">
+        <section class="board" id="quest-board" aria-labelledby="board-title">
+          <div class="section-heading"><div><span class="section-kicker">GUILD QUEST BOARD</span><h2 id="board-title"><span data-icon="scroll"></span>冒险委托看板</h2></div><span class="board-live"><i class="online-dot"></i> 等你入队</span></div>
+          <div id="mine-tabs" class="mine-tabs" role="group" aria-label="我的冒险分类" hidden><button data-mine="joined" aria-pressed="true">我报名的</button><button data-mine="published" aria-pressed="false">我发布的</button><button data-mine="manageable" aria-pressed="false">可管理的</button></div>
+          <div class="filters">
+            <label class="search-field"><span data-icon="search"></span><input id="search" type="search" maxlength="40" placeholder="寻找游戏，或你的下一场冒险…" aria-label="搜索游戏名称"></label>
+            <div class="filter-controls">
+              <label class="filter-select"><span class="sr-only">按游戏筛选</span><select id="filter-game"><option value="">全部游戏</option></select></label>
+              <label class="filter-select"><span class="sr-only">按招募状态筛选</span><select id="filter-status"><option value="active">进行中的委托</option><option value="all">全部状态</option><option value="recruiting">正在招募</option><option value="soon">即将开始</option><option value="full">已满员</option><option value="ended">已结束</option><option value="cancelled">已取消</option></select></label>
+              <label class="filter-date"><span class="sr-only">按开黑日期筛选</span><input type="date" id="filter-date" aria-label="按开黑日期筛选"></label>
+              <label class="check-label slot-check"><input type="checkbox" id="filter-slots">只看有空位</label>
+            </div>
+          </div>
+          <div class="list-toolbar"><p id="result-count" aria-live="polite">正在打开公告板…</p><div><button class="text-button" id="clear-filters">清除筛选</button><label class="sort-label"><span class="sr-only">排序方式</span><select id="sort"><option value="start">最近开场优先</option><option value="newest">最新发布优先</option><option value="slots">剩余名额优先</option></select></label></div></div>
+          <div class="quest-grid" id="quest-list"></div>
+          <div class="board-bottom"><span>✧</span> 每一次组队，都是新故事的开始 <span>✧</span></div>
+        </section>
+
+        <aside class="right-rail">
+          <section class="notice-panel"><div class="panel-title"><span data-icon="megaphone"></span><h2>公会公告</h2><span class="pin-dot"></span></div><div class="notice-label">致每一位冒险者</div><h3>带上好心情，<br>剩下的交给队友。</h3><p>这里没有最强的玩家，<br>只有最好玩的队友。</p><ul class="guild-rules"><li><span>01</span>守时赴约，有事提前说</li><li><span>02</span>萌新友好，拒绝压力怪</li><li><span>03</span>文明开麦，快乐开黑</li></ul><button class="text-button" data-action="guide">翻开冒险者指南 <span>↗</span></button></section>
+          <section class="personal-panel"><div class="panel-title"><span data-icon="compass"></span><h2>我的冒险手册</h2></div><div class="personal-intro"><span class="avatar user-initial">酱</span><div><strong class="user-name">酱菜见习生</strong><small>今天也要快乐开黑</small></div><span class="level-badge">Lv. 01</span></div><div class="personal-counts"><a href="#mine" id="my-joined-link"><b id="my-joined-count">0</b><span>已报名</span></a><a href="#mine/published"><b id="my-published-count">0</b><span>已发布</span></a></div><a href="#mine" class="button subtle wide">查看我的冒险 <span data-icon="arrow"></span></a></section>
+          <section class="demo-panel"><span data-icon="flask"></span><div><strong>这里是一间练习用的公会</strong><p>示例委托可自由体验。数据仅保存在当前浏览器，不会同步给群友。</p><button class="text-button" data-action="clear-demo" id="clear-demo">清除示例委托</button></div></section>
+          <div class="rail-decoration">✦ <span>GOOD GAMES. GOOD COMPANY.</span> ✦</div>
+        </aside>
+      </div>
+      <footer><span><b>酱菜冒险者公会</b> · 为每一场快乐开黑而生</span><span>本地演示 · 时间均为北京时间 <button class="text-button" data-action="export">导出数据</button></span></footer>
+    </main>
+  </div>
+
+  <dialog id="create-dialog" aria-labelledby="create-title" class="form-dialog">
+    <div class="dialog-heading"><div><span class="section-kicker">A NEW ADVENTURE</span><h2 id="create-title">发布冒险委托</h2><p>写下你的计划，等一群有趣的队友。</p></div><button class="icon-button" data-dismiss aria-label="关闭发布表单"><span data-icon="x"></span></button></div>
+    <form id="create-form" novalidate>
+      <div class="form-body">
+        <label>游戏名称 <em>*</em><input name="game" id="create-game" list="preset-games" required maxlength="40" placeholder="选择预设游戏，也可以输入任何游戏名"><datalist id="preset-games"></datalist><small>支持自定义游戏，输入后直接发布即可。</small></label>
+        <div class="form-row"><label>开黑日期 <em>*</em><input name="date" type="date" required></label><label>开黑时间 <em>*</em><input name="time" type="time" required></label></div>
+        <p class="field-tip">时间均为北京时间（UTC+8），到点后自动结束招募。</p>
+        <div class="form-row"><label>队伍总人数 <em>*</em><input name="capacity" type="number" min="1" max="32" step="1" value="4" required></label><label>语音要求 <em>*</em><select name="voice"><option value="any">不限，开心就好</option><option value="required">需要语音</option><option value="none">不使用语音</option></select></label></div>
+        <label class="check-label creator-check"><input name="includeCreator" type="checkbox" checked>我也参加，占用一个队伍名额</label>
+        <label>发布者昵称 <em>*</em><input name="nickname" required maxlength="20" placeholder="队友该怎么称呼你？"><small>这是本地演示昵称，修改后会同步更新你的已有委托与报名。</small></label>
+        <label>委托备注 <span class="optional">选填</span><textarea name="note" maxlength="500" rows="3" placeholder="说说玩法、难度、游戏进度，以及是否欢迎萌新…"></textarea></label>
+        <p id="create-error" class="form-error" role="alert" hidden></p>
+      </div><div class="dialog-footer"><button class="button subtle" type="button" data-dismiss>再想想</button><button type="submit" class="button primary"><span data-icon="plus"></span>确认发布委托</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="detail-dialog" aria-labelledby="detail-title"><div id="detail-content"></div></dialog>
+  <dialog id="profile-dialog" class="compact-dialog" aria-labelledby="profile-title"><div class="dialog-heading"><div><span class="section-kicker">YOUR GUILD IDENTITY</span><h2 id="profile-title">冒险者名片</h2></div><button class="icon-button" data-dismiss aria-label="关闭名片"><span data-icon="x"></span></button></div><form id="profile-form" novalidate><div class="form-body"><div class="identity-note">当前使用本地演示身份，尚未接入 QQ 登录。改昵称不会改变身份，也不会丢失你的报名。</div><label>冒险者昵称<input name="nickname" maxlength="20" required placeholder="输入 1–20 个字符"></label><p id="profile-error" class="form-error" role="alert" hidden></p></div><div class="dialog-footer"><button type="button" class="button subtle" data-dismiss>取消</button><button type="submit" class="button primary">保存名片</button></div></form></dialog>
+  <dialog id="info-dialog" class="compact-dialog" aria-labelledby="info-title"><div class="dialog-heading"><h2 id="info-title"></h2><button class="icon-button" data-dismiss aria-label="关闭说明"><span data-icon="x"></span></button></div><div id="info-content" class="info-body"></div><div class="dialog-footer"><button class="button primary" data-dismiss>了解啦</button></div></dialog>
+  <dialog id="confirm-dialog" class="compact-dialog" aria-labelledby="confirm-title"><div class="dialog-heading"><h2 id="confirm-title">确认操作</h2><button class="icon-button" data-dismiss aria-label="取消操作"><span data-icon="x"></span></button></div><p id="confirm-message" class="info-body"></p><p id="confirm-error" class="form-error confirm-error" role="alert" hidden></p><div class="dialog-footer"><button class="button subtle" data-dismiss>保留原样</button><button id="confirm-submit" class="button danger">确认</button></div></dialog>
+  <div id="toast-container" role="status" aria-live="polite" aria-atomic="true"></div>
+  <noscript><div class="noscript">请开启 JavaScript，才能发布委托和报名组队。</div></noscript>
+</body>
+</html>

@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 650 420" fill="none">
+  <defs>
+    <linearGradient id="sky" x2="0" y2="1"><stop stop-color="#b77456"/><stop offset="1" stop-color="#d1a67a"/></linearGradient>
+    <linearGradient id="ground" x2="0" y2="1"><stop stop-color="#b7b48b"/><stop offset="1" stop-color="#7d8c6b"/></linearGradient>
+    <pattern id="grain" width="8" height="8" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r=".65" fill="#fff0c9" opacity=".12"/></pattern>
+  </defs>
+  <circle cx="400" cy="180" r="165" fill="url(#sky)" opacity=".35"/>
+  <circle cx="466" cy="106" r="52" fill="#f7d8a0"/>
+  <path d="M145 235 247 91 309 185 358 121 450 239Z" fill="#a27866"/>
+  <path d="m247 91-28 40 26-7 21 9Z" fill="#e0c2a0"/><path d="m358 121-24 37 27-11 19 6Z" fill="#debd99"/>
+  <path d="m313 247 119-99 55 52 55-54 91 114Z" fill="#ad9873"/>
+  <path d="M79 304c42-71 94-104 163-82 64 20 53 30 123-5 79-38 149 7 178 42l51 58-63 47H149Z" fill="#c2b087"/>
+  <path d="M118 306c46-52 122-52 175-34 81 29 99-51 195-30 43 10 68 36 99 77-35 53-106 84-201 89-103 6-215-30-268-102Z" fill="url(#ground)"/>
+  <path d="M170 344c70 8 103-10 114-32 16-30 55-16 81-39 18-15-28-12-20-34 7-18 49-29 67-31" stroke="#e3cc99" stroke-width="18" stroke-linecap="round"/>
+  <path d="M192 348c59 1 96-30 94-37" stroke="#f4ddad" stroke-width="3" stroke-linecap="round" opacity=".5"/>
+  <g fill="#626e50"><path d="m159 248-24 54h48Z"/><path d="m177 280-19 44h38Z"/><path d="m488 279-25 59h50Z"/><path d="m521 263-31 72h62Z"/><path d="m467 302-20 49h40Z"/><path d="m214 207-24 51h48Z"/></g>
+  <g fill="#8d9771"><path d="m159 248-16 35h32Z"/><path d="m521 263-22 47h44Z"/><path d="m488 279-18 38h36Z"/></g>
+  <g stroke="#665745" stroke-width="4"><path d="M159 299v13m18 4v15m311-4v20m33-18v19m-54-9v20m-253-112v19"/></g>
+  <g transform="translate(296 178)">
+    <path d="m-42 69 74-28 65 25-67 32Z" fill="#657057" opacity=".3"/>
+    <path d="M-30 16 22-7 71 15v61L22 91-30 66Z" fill="#e7cca0"/>
+    <path d="M22 32 71 15v61L22 91Z" fill="#c9ae80"/>
+    <path d="m-44 20 54-61 77 55-64 24Z" fill="#774a3c"/>
+    <path d="m10-41 77 55-64 24Z" fill="#955741"/>
+    <path d="M-44 20 10-41 23 38Z" fill="#ad6f4f"/>
+    <path d="M-16 46q12-9 23 1v36l-23-11Z" fill="#69523f"/>
+    <path d="M39 41 57 35v20l-18 6Z" fill="#795a42"/>
+    <path d="m48 38 1 20m-10-7 18-6" stroke="#e3c293" stroke-width="3"/>
+    <path d="M-17 19 2 13v17l-19 6Z" fill="#e5c997"/>
+    <path d="M43-17v-34l17 6v40Z" fill="#c49d73"/>
+    <path d="m40-51 20-6 5 11-19 5Z" fill="#784d3d"/>
+    <path d="M52-69c-18-11 18-16 2-31" stroke="#e7c49c" stroke-width="8" stroke-linecap="round" opacity=".45"/>
+    <path d="m78 51 30 7v21L78 73Z" fill="#d2b584"/>
+    <path d="m78 51 30 7v21L78 73Z" stroke="#70543d" stroke-width="3"/>
+    <path d="M91 80v24" stroke="#70543d" stroke-width="4"/>
+    <path d="m86 62 13 3" stroke="#795940" stroke-width="3"/>
+  </g>
+  <g transform="translate(407 143)"><path d="M0 42V2l17 8v38Zm17 6V-12l25 10v59ZM42 57V8l19 8v45Z" fill="#d9c398"/><path d="m-5 2 15-23L22 9Zm16-14 19-27L47-1Zm28 20 11-19 16 27Z" fill="#815a48"/><path d="M28 28v18" stroke="#8e795c" stroke-width="7"/><path d="M29-39v-25" stroke="#dac293" stroke-width="2"/><path d="m30-64 22 8-22 8Z" fill="#e4b96f"/></g>
+  <g stroke="#ddbd85" stroke-width="2" opacity=".8"><path d="M156 112v16m-8-8h16m363 74v12m-6-6h12M337 60v12m-6-6h12"/><path d="m193 163 3 7 7 3-7 3-3 7-3-7-7-3 7-3Z"/></g>
+  <path d="M372 91q12-10 24 0m-227 94q10-9 20 0m329-65q10-9 20 0" stroke="#f0d4a4" stroke-width="2"/>
+  <path d="M66 191h55m-42 10h27m420 29h57m-31 9h28" stroke="#e3ba91" stroke-width="3" stroke-linecap="round" opacity=".5"/>
+  <g transform="translate(545 69)" stroke="#ebd1a2"><circle r="21" opacity=".5"/><path d="M0-30v60m-30-30h60" opacity=".35"/><path d="m0-17 5 17-5 17-5-17Z" fill="#e5c48c"/><path d="m-17 0 17-5 17 5-17 5Z" fill="#ab7756"/></g>
+  <path d="m253 322 9-5 9 5v17l-9 5-9-5Z" fill="#ead3a0"/><path d="m262 317 4-25" stroke="#694d3d" stroke-width="3"/><path d="m265 292 21 8-23 7Z" fill="#a7583b"/>
+  <rect width="650" height="420" fill="url(#grain)"/>
+</svg>

@@ -1,0 +1,13 @@
+{
+  "name": "jiangcai-adventurers-guild",
+  "version": "1.0.0",
+  "private": true,
+  "description": "酱菜冒险者公会 · Steam 游戏开黑招募系统",
+  "scripts": {
+    "start": "node server.cjs",
+    "test": "node --test tests/*.test.cjs",
+    "test:browser": "node tests/browser.cjs",
+    "check": "node --check js/data.js && node --check js/ui.js && node --check js/app.js && node --check server.cjs"
+  },
+  "engines": { "node": ">=18" }
+}
