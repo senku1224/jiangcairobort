@@ -341,3 +341,13 @@ body[data-backend="supabase"] .demo-panel { display: none; }
 .binding-code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 27px; font-weight: 700; letter-spacing: 7px; text-align: center; color: #81503b; background: #fafaf4; border: 1px dashed #d5c2ac; border-radius: 6px; padding: 12px 8px; }
 .binding-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .binding-actions .button { flex: 1 1 auto; justify-content: center; }
+
+/* 共享模式 · 邀请群友面板（本地模式下示例面板才会显示） */
+.share-panel { display: none; grid-column: 1/-1; margin-top: 19px; border: 1px solid var(--line); border-radius: 7px; background: #fcfbf5; padding: 18px; }
+body[data-backend="supabase"] .share-panel { display: block; }
+.share-panel .panel-title { color: #798166; }
+.share-panel p { font-size: 11px; line-height: 1.9; color: #80866b; margin: 10px 0 11px; }
+.share-link { background: #f0f1e5; border: 1px dashed #d5c2ac; border-radius: 6px; padding: 9px 11px; margin-bottom: 11px; overflow-x: auto; }
+.share-link code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px; color: #81503b; white-space: nowrap; }
+.share-panel .button { font-size: 11px; min-height: 36px; }
+@media (max-width: 600px) { .share-panel { padding: 16px 18px; } .share-panel p { font-size: 11px; } }

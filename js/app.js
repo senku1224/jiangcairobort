@@ -47,6 +47,8 @@
     if (nicknameHint) nicknameHint.textContent = shared
       ? '发布后会同步到共享公会，群友都能看到这份委托。'
       : '这是本地演示昵称，修改后会同步更新你的已有委托与报名。';
+    const shareUrl = select('#share-url');
+    if (shareUrl) shareUrl.textContent = location.origin + location.pathname;
     if (!shared && backend.reason && backend.reason.startsWith('共享数据库连接失败')) toast(backend.reason, true);
   }
   function openDialog(element) {
@@ -282,6 +284,14 @@
       try { await refreshBinding(); toast('已刷新绑定状态。'); }
       catch (error) { toast(error.message, true); }
       finally { button.disabled = false; }
+    } else if (action === 'copy-link') {
+      const link = location.origin + location.pathname;
+      try {
+        await navigator.clipboard.writeText(link);
+        toast('看板链接已复制，粘贴到 QQ 群就能邀请群友。');
+      } catch {
+        toast(`复制失败，请手动复制：${link}`, true);
+      }
     } else if (action === 'guide' || action === 'about') showInfo(action);
     else if (action === 'detail') {
       detailId = questId;
