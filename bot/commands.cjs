@@ -59,6 +59,11 @@ async function handleCommand(text, deps, prefix) {
       return { handled: true, reply: `招募网站 👉 ${deps.siteUrl}` };
     case 'quests': {
       try {
+        // 优先用带缓存兜底的读取；不支持时回退到普通读取（便于测试替身）
+        if (typeof deps.reader.listOpenQuestsSafe === 'function') {
+          const { quests, stale, savedAt } = await deps.reader.listOpenQuestsSafe();
+          return { handled: true, reply: formatQuestList(quests, deps.siteUrl, { stale, savedAt }) };
+        }
         const quests = await deps.reader.listOpenQuests();
         return { handled: true, reply: formatQuestList(quests, deps.siteUrl) };
       } catch (error) {

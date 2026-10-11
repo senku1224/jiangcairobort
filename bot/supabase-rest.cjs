@@ -3,9 +3,14 @@
  * 网络注意：本机直连 Supabase(Cloudflare) 可能被重置，需经代理才能稳定访问。
  * 因此这里支持「经 HTTP 代理的 CONNECT 隧道」并在网络抖动时自动重试。
  * 当前阶段只用公开的 publishable key 做只读，不依赖 service key。
+ *
+ * 缓存兜底：每次成功读取后会把结果落盘到本机（bot/data/，已被 gitignore）。
+ * 网络不通时用「上次成功的数据」回复，并标注可能不是最新，避免群里只看到报错。
  */
 'use strict';
 
+const fs = require('node:fs');
+const path = require('node:path');
 const http = require('node:http');
 const https = require('node:https');
 const { URL } = require('node:url');
@@ -75,12 +80,29 @@ async function withRetry(url, options, settings) {
   throw lastError;
 }
 
+function readCache(cachePath) {
+  try {
+    const raw = fs.readFileSync(cachePath, 'utf8');
+    const parsed = JSON.parse(raw);
+    if (parsed && Array.isArray(parsed.quests)) return parsed;
+  } catch { /* 无缓存或损坏：忽略 */ }
+  return null;
+}
+
+function writeCache(cachePath, quests) {
+  try {
+    fs.mkdirSync(path.dirname(cachePath), { recursive: true });
+    fs.writeFileSync(cachePath, JSON.stringify({ savedAt: new Date().toISOString(), quests }, null, 2));
+  } catch { /* 写缓存失败不影响主流程 */ }
+}
+
 function createReader(supabaseUrl, apiKey, settings = {}) {
   const base = supabaseUrl.replace(/\/$/, '');
   const headers = { apikey: apiKey, authorization: `Bearer ${apiKey}` };
+  const cachePath = settings.cachePath || path.join(__dirname, 'data', 'quests-cache.json');
 
-  async function rest(path) {
-    const response = await withRetry(`${base}/rest/v1/${path}`, { headers }, settings);
+  async function rest(pathname) {
+    const response = await withRetry(`${base}/rest/v1/${pathname}`, { headers }, settings);
     if (response.status < 200 || response.status >= 300) {
       throw new Error(`Supabase 读取失败：HTTP ${response.status} ${response.text.slice(0, 200)}`);
     }
@@ -105,7 +127,22 @@ function createReader(supabaseUrl, apiKey, settings = {}) {
     }));
   }
 
-  return { listOpenQuests };
+  // 带缓存兜底：读取成功则更新缓存并返回 { quests, stale:false }；
+  // 读取失败则回退到上次成功的缓存，返回 { quests, stale:true, savedAt, error }；
+  // 完全无缓存时才抛错。
+  async function listOpenQuestsSafe(limit = 10) {
+    try {
+      const quests = await listOpenQuests(limit);
+      writeCache(cachePath, quests);
+      return { quests, stale: false, savedAt: new Date().toISOString() };
+    } catch (error) {
+      const cached = readCache(cachePath);
+      if (cached) return { quests: cached.quests, stale: true, savedAt: cached.savedAt, error: error.message };
+      throw error;
+    }
+  }
+
+  return { listOpenQuests, listOpenQuestsSafe };
 }
 
 function toBeijing(iso) {
@@ -114,14 +151,21 @@ function toBeijing(iso) {
   return date.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false, month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
 }
 
-function formatQuestList(quests, siteUrl) {
-  if (!quests.length) return '当前没有开放中的招募。去网站发布一份吧 👉 ' + siteUrl;
+function formatQuestList(quests, siteUrl, meta = {}) {
+  const staleNote = meta.stale
+    ? `\n⚠️ 当前网络读取失败，以下为缓存数据（${meta.savedAt ? toBeijing(meta.savedAt) : '较早'} 抓取），可能不是最新。`
+    : '';
+  if (!quests.length) {
+    return (meta.stale
+      ? '当前网络读取失败，且暂无可用缓存。稍后重试或直接到网站查看 👉 ' + siteUrl
+      : '当前没有开放中的招募。去网站发布一份吧 👉 ' + siteUrl);
+  }
   const lines = quests.slice(0, 8).map((quest, index) => {
     const seat = quest.remaining > 0 ? `剩 ${quest.remaining} 席` : '已满员';
     const note = quest.note ? `｜${String(quest.note).slice(0, 12)}` : '';
     return `${index + 1}. ${quest.game}｜${toBeijing(quest.start_at)}｜${seat}｜队长 ${quest.owner_nickname}${note}`;
   });
-  return ['当前开放招募：', ...lines, `共 ${quests.length} 份 · 报名请到网站 👉 ${siteUrl}`].join('\n');
+  return ['当前开放招募：', ...lines, `共 ${quests.length} 份 · 报名请到网站 👉 ${siteUrl}`].join('\n') + staleNote;
 }
 
 module.exports = { createReader, toBeijing, formatQuestList };
