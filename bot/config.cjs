@@ -46,6 +46,9 @@ const config = {
   supabaseUrl: env.SUPABASE_URL || 'https://cvuqgcuwfgpttgklkwiy.supabase.co',
   supabaseKey: env.SUPABASE_KEY || 'sb_publishable_89rNeFjm8oZHqOnWKbQKgg_DvjjvMH6',
   supabaseServiceKey: env.SUPABASE_SERVICE_KEY || '',
+  // 访问 Supabase 用的 HTTP 代理（有些网络直连 Cloudflare 会被重置）。
+  // 优先 BOT_PROXY，其次标准代理环境变量；留空则直连。
+  httpProxy: env.BOT_PROXY || env.HTTPS_PROXY || env.https_proxy || env.HTTP_PROXY || env.http_proxy || '',
   siteUrl: env.SITE_URL || 'https://senku1224.github.io/jiangcairobort/'
 };
 

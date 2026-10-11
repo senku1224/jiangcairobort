@@ -12,7 +12,7 @@ const { startEventServer, reply, replyPrivate, extractText, isMentioned, log } =
 const { createReader } = require('./supabase-rest.cjs');
 const { handleCommand } = require('./commands.cjs');
 
-const reader = createReader(config.supabaseUrl, config.supabaseKey);
+const reader = createReader(config.supabaseUrl, config.supabaseKey, { proxy: config.httpProxy, retries: 4 });
 const deps = { reader, siteUrl: config.siteUrl };
 
 function stripTriggers(text) {

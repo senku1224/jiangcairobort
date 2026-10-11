@@ -30,18 +30,24 @@ function startEventServer(options, onEvent) {
 }
 
 async function callApi(options, action, params) {
+  // NapCat 的 HTTP 接口地址为 /<action>，请求体直接是参数对象（不带 {action, params} 信封）。
   const response = await fetch(`${options.api.replace(/\/$/, '')}/${action}`, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
       ...(options.token ? { authorization: `Bearer ${options.token}` } : {})
     },
-    body: JSON.stringify({ action, params, echo: `${action}-${Date.now()}` })
+    body: JSON.stringify(params || {})
   });
   const text = await response.text();
   let data;
   try { data = JSON.parse(text); } catch { data = { raw: text }; }
   if (!response.ok) throw new Error(`OneBot API ${action} 失败：HTTP ${response.status} ${text.slice(0, 200)}`);
+  // OneBot 在业务失败时仍可能返回 HTTP 200，需要看 retcode
+  if (data && typeof data.retcode === 'number' && data.retcode !== 0) {
+    const detail = data.message || data.wording || data.msg || '';
+    throw new Error(`OneBot API ${action} 失败：retcode ${data.retcode}${detail ? ' ' + detail : ''}`);
+  }
   return data;
 }
 
