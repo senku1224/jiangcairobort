@@ -330,3 +330,14 @@ dialog::backdrop { background: #252d2473; backdrop-filter: blur(4px); }
 
 /* 接入共享数据库后，本地示例面板不再适用，隐藏之 */
 body[data-backend="supabase"] .demo-panel { display: none; }
+
+/* 冒险者名片 · QQ 绑定区块 */
+.binding-block { background: #f0f1e5; border: 1px solid #dee3c9; border-radius: 6px; padding: 14px; font-size: 11px; line-height: 1.8; color: #80866b; display: grid; gap: 9px; }
+.binding-head { display: flex; align-items: center; justify-content: space-between; color: #59634c; }
+.binding-head strong { font-size: 12px; }
+.binding-ok { color: #5f7d52; font-weight: 700; }
+.binding-hint { margin: 0; }
+.binding-qq { margin: 0; font-size: 19px; font-weight: 600; letter-spacing: 1px; color: #59634c; }
+.binding-code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 27px; font-weight: 700; letter-spacing: 7px; text-align: center; color: #81503b; background: #fafaf4; border: 1px dashed #d5c2ac; border-radius: 6px; padding: 12px 8px; }
+.binding-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.binding-actions .button { flex: 1 1 auto; justify-content: center; }

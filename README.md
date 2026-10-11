@@ -83,6 +83,7 @@ js/ui.js                卡片、插画、详情与纯筛选函数
 js/app.js               路由、表单、弹窗、事件协调
 server.cjs              零依赖本地静态服务器
 supabase/schema.sql     数据表、触发器与 RLS 策略
+supabase/phase1-identity.sql  阶段 1：身份表 + 归属列改 uuid + RLS 收紧
 tests/data.test.cjs     数据规则与筛选回归测试
 tests/browser.cjs       Chrome 浏览器交互与响应式检查
 ```
@@ -106,31 +107,35 @@ npm run test:browser
 项目已接入 Supabase：招募与报名数据存放在共享数据库，群友看到的是**同一份**公告板。
 
 - 公开配置在 `js/config.js`（Project URL + publishable key）。publishable key 本就是给浏览器用的公开密钥，**不要**在这里放 secret / service_role key。
-- 数据表结构在 `supabase/schema.sql`。首次使用需在 Supabase 控制台 → SQL Editor 里整段执行一次（可重复执行，不会删除已有数据）。
-- 表：`quests`（招募）与 `quest_members`（报名），含主键、外键关联（报名 → 委托，级联删除）、创建时间、招募状态、人数上限、语音要求、备注、示例标记等字段。约束保证人数为 1–32、状态只能取合法值。
-- 触发器 `enforce_member_rules` 在数据库层再校验一次「委托是否已截止 / 是否已满员」，防止绕过前端造成超员或给已截止委托报名。
+- 数据表结构在 `supabase/schema.sql`（基础表）与 `supabase/phase1-identity.sql`（身份地基：新增表 + 归属列改 uuid + 收紧 RLS）。两者都需要在 Supabase 控制台 → SQL Editor 里整段执行一次，**先 schema，后 phase1**。
+- 身份接入还需在控制台开启：Authentication → Sign In / Providers → **Anonymous sign-ins**（否则网页会回退到本地演示模式并给出提示）。
+- 表：`quests`（招募）、`quest_members`（报名），以及 `profiles`（冒险者档案）、`link_codes`（QQ 绑定码）、`groups`（群白名单）。含主键、外键关联、创建时间、招募状态、人数上限、语音要求、备注等字段。
+- 触发器 `enforce_member_rules` 在数据库层再校验一次「委托是否已截止 / 是否已满员」，防止绕过前端造成超员或给已截止委托报名；`protect_profile_columns` 保证 QQ 绑定关系只能由服务端写入。
 - 客户端库已内置在 `vendor/supabase-js.umd.js`，因此仍然**不需要** `npm install`，也能离线打开本地模式。
-- 连接失败（未建表 / 网络不通）时自动回退到本地演示模式，并在界面给出明确提示，**不会假装已连上**。
+- 连接失败（未建表 / 未开匿名登录 / 网络不通）时自动回退到本地演示模式，并在界面给出明确提示，**不会假装已连上**。
 
-**localStorage 现在只用于：** 本地模式下的完整演示数据、浏览器内的身份标识，以及界面状态。共享模式下，跨浏览器的业务数据一律以数据库为准。
+**localStorage 现在只用于：** 本地模式下的完整演示数据、匿名登录会话（`jiangcai.guild.auth.v1`）、昵称，以及界面状态。共享模式下，跨浏览器的业务数据一律以数据库为准。
 
 ## 身份与权限（重要）
 
-**目前没有登录，也没有可靠的用户身份认证。** 身份只是每个浏览器本地生成的一个随机 ID（`jiangcai.guild.identity.v1`），可以被人为修改。因此：
+网站会为每个浏览器自动做一次 **Supabase 匿名登录**，得到一个真实的 `auth.uid()`，并据此决定权限：
 
-- 匿名（所有访问者）**可以**：查看公告板、发布委托、报名、取消报名、结束或取消自己发起的委托。
-- 数据库已开启 Row Level Security，并做了力所能及的收口：
-  - `quests`：允许读和发布；修改时只允许状态字段取合法值；**删除只对 `is_demo = true` 的示例委托开放**，真实委托无法被匿名删除。
-  - `quest_members`：允许读、报名、取消报名、同步昵称。
-- **无法被安全保证的部分**（不假装已实现）：数据库无法判断「这条记录是不是本人写的」，理论上仍有人能改动或删除他人的报名、他人委托的状态。要做到「只有本人能改自己的记录」，必须先有可信身份。
-- 现在的权限定位是「防误伤 + 防超员」，**不是**「防恶意」。
+- 可以：查看公告板、发布委托（记在自己名下）、报名、取消自己的报名、结束或取消自己发起的委托。
+- 数据库已开启 Row Level Security，并按 `auth.uid()` 判归属：
+  - `quests`：`insert / update / delete` 都要求 `auth.uid() = owner_id`，**改不了也删不了别人的委托**。
+  - `quest_members`：`insert / update / delete` 都要求 `auth.uid() = user_id`，**动不了别人的报名**。
+  - `profiles`：只能读写自己那一行；`qq_number` / `bound_at` 由触发器保护，**网页端无法自行写入**，只能由持有 service key 的可信后端核销绑定码后写入。
+  - `link_codes`：网页端只能创建/查看/作废自己的绑定码。
+- **它不是账号**：匿名身份保存在当前浏览器，换浏览器或清空数据会变成新身份（旧记录还在，但不再属于"你"）。要跨设备认人，需要绑定 QQ 或后续接入正式登录。
+- 因此现在的权限定位是「**防越权**」：别人改不动你的记录；反过来，你也不再能修改别人的数据。这是设计目标，不是缺陷。
 
 ## 后续步骤
 
-1. **建表**：在 Supabase SQL Editor 运行一次 `supabase/schema.sql`。
-2. **用户身份**：接入 Supabase Auth 或 QQ 登录，让身份可验证；之后再按 `auth.uid()` 收紧 RLS，实现「只能改自己的记录」。
-3. **公开部署**：把静态站点部署到支持 HTTPS 的托管；`server.cjs` 仅用于本地开发。
-4. **QQ 机器人**：**尚未接入**。群消息通知、按钮交互等都需要真实后端 + 机器人接口权限，届时应经由后端读写数据库，而不是让前端直连；在此之前不要声称机器人已经工作。
+1. **身份地基（阶段 1）**：开启 Supabase 匿名登录，并在 SQL Editor 运行 `supabase/phase1-identity.sql`。
+2. **QQ 绑定核销（阶段 2）**：机器人后端用 service key 核销绑定码，写入 `profiles.qq_number`（service key 只放本机 `.env`）。
+3. **机器人写入（阶段 3）**：`/报名`、`/取消`、`/我的` 经可信后端写库。
+4. **公开部署**：静态站点已托管在 GitHub Pages（公开地址）；若要限制访问，需要带访问控制的托管。
+5. **网络可达性**：当前网络直连 Supabase / GitHub 会被重置，需要代理；要让群友无代理可用，需把后端与托管迁到网络可达的位置。
 
 现代浏览器在 HTTP 同源多标签页中通过 Web Locks 串行处理本地修改，并通过 `storage` 事件刷新其他标签页。共享模式下由 15 秒轮询与页面重新可见时的刷新保证数据新鲜度。
 

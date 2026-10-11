@@ -29,7 +29,13 @@
 
     try {
       const client = library.createClient(config.supabaseUrl, config.supabasePublishableKey, {
-        auth: { persistSession: false, autoRefreshToken: false }
+        auth: {
+          // 匿名登录会建立一个持久会话（浏览器本地保存），刷新后身份保持一致。
+          persistSession: true,
+          autoRefreshToken: true,
+          detectSessionInUrl: false,
+          storageKey: 'jiangcai.guild.auth.v1'
+        }
       });
       const service = root.GuildSupabase.createSupabaseService(client, storage, clock);
       await service.init();

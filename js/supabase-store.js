@@ -1,22 +1,36 @@
-/* Supabase 共享数据服务。
+/* Supabase 共享数据服务（阶段 1：已接入真实身份）。
  *
- * 与 js/data.js 的 GuildData.createService 返回完全相同的异步接口：
+ * 与 js/data.js 的 GuildData.createService 返回相同的异步接口：
  *   init / snapshot / updateNickname / createQuest / joinQuest / leaveQuest /
  *   finishQuest / clearDemo / exportData
- * 界面层因此不需要改动，只是把 localStorage 换成了共享数据库。
+ * 另外新增身份相关接口：createLinkCode / bindingStatus。
  *
- * 身份：仍然存放在浏览器 localStorage（键 jiangcai.guild.identity.v1），
- * 因为当前尚未接入登录。它是「同一浏览器内的稳定标识」，不是经过验证的账号，
- * 因此任何人都可以伪造它；真正的权限最终只能靠 RLS + 未来的身份认证来保证。
+ * 身份：使用 Supabase Auth 的**匿名登录**（signInAnonymously），
+ * 每个浏览器拿到一个真实的 auth.uid()，会话持久化在本地。
+ * 它不是"账号"，但已足以让 RLS 用 auth.uid() 判断「这条记录是不是你的」。
+ * 绑定 QQ 后，机器人才知道"网页上的谁 = 群里的哪个 QQ"。
+ *
+ * 界面层无需关心这些细节，仍然只调用上面那组方法。
  */
 (function (root) {
   'use strict';
 
-  const IDENTITY_KEY = 'jiangcai.guild.identity.v1';
+  const NICKNAME_KEY = 'jiangcai.guild.nickname.v1';
+  const LEGACY_IDENTITY_KEY = 'jiangcai.guild.identity.v1'; // 旧版本地身份，仅用于迁移昵称
+  const DEFAULT_NICKNAME = '酱菜见习生';
   const COLUMNS = 'id,game,owner_id,owner_nickname,start_at,created_at,capacity,voice,note,state,is_demo,quest_members(user_id,nickname,created_at)';
 
-  function newId() {
+  function newQuestId() {
     return root.crypto?.randomUUID?.() || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
+  }
+
+  function randomCode() {
+    if (root.crypto?.getRandomValues) {
+      const buffer = new Uint32Array(1);
+      root.crypto.getRandomValues(buffer);
+      return String(buffer[0] % 1000000).padStart(6, '0');
+    }
+    return String(Math.floor(Math.random() * 1000000)).padStart(6, '0');
   }
 
   function textField(value, label, max, required = true) {
@@ -26,13 +40,32 @@
     return result;
   }
 
+  function isMissingTable(error) {
+    return /does not exist|schema cache|PGRST205/i.test(error?.message || '');
+  }
+
   function mapError(error) {
     const message = error?.message || '共享服务器返回了未知错误。';
     if (/duplicate key/i.test(message)) return new Error('你已经在这支队伍里啦。');
-    if (/does not exist|schema cache|PGRST205/i.test(message)) {
-      return new Error('共享数据表尚未创建，请先在 Supabase 运行 supabase/schema.sql。');
+    if (/row-level security/i.test(message)) {
+      return new Error('数据库拒绝了这次操作：只能修改你自己的委托或报名。请刷新页面后重试。');
+    }
+    if (/foreign key/i.test(message)) return new Error('关联的记录已不存在，请刷新列表后重试。');
+    if (isMissingTable(error)) {
+      return new Error('共享数据表尚未创建，请先在 Supabase 运行 supabase/phase1-identity.sql。');
     }
     return new Error(message);
+  }
+
+  function mapAuthError(error) {
+    const message = error?.message || '登录失败。';
+    if (/anonymous.*disabled/i.test(message)) {
+      return new Error('共享公会尚未开启匿名登录：请在 Supabase 控制台打开 Authentication → Sign In / Providers → Anonymous sign-ins。');
+    }
+    if (/fetch|network|Failed to fetch/i.test(message)) {
+      return new Error('无法连接共享公会数据库（网络不通或需要代理）。');
+    }
+    return new Error(`登录共享公会失败：${message}`);
   }
 
   function fromRow(row) {
@@ -57,28 +90,61 @@
 
   function createSupabaseService(client, storage, clock = () => Date.now()) {
     const helpers = root.GuildData;
-    let identity = null;
+    const me = { id: null, nickname: DEFAULT_NICKNAME, qqNumber: null, boundAt: null };
+    let profilesReady = true;
+    let ready = false;
 
-    function loadIdentity() {
-      if (identity) return identity;
-      let raw = null;
-      try { raw = storage.getItem(IDENTITY_KEY); } catch { /* 存储被禁用时退化为每次新身份 */ }
-      if (raw) {
+    function storedNickname() {
+      let name = null;
+      try { name = storage.getItem(NICKNAME_KEY); } catch { /* 存储不可用 */ }
+      if (!name) {
+        // 从旧版随机身份里迁移一次昵称
         try {
-          const parsed = JSON.parse(raw);
-          if (parsed && typeof parsed.id === 'string' && parsed.id && typeof parsed.nickname === 'string' && parsed.nickname) {
-            identity = { id: parsed.id, nickname: parsed.nickname };
-            return identity;
+          const legacy = storage.getItem(LEGACY_IDENTITY_KEY);
+          if (legacy) {
+            const parsed = JSON.parse(legacy);
+            if (parsed && typeof parsed.nickname === 'string') name = parsed.nickname;
           }
-        } catch { /* 忽略损坏的身份，重建一个 */ }
+        } catch { /* 忽略损坏数据 */ }
       }
-      identity = { id: newId(), nickname: '酱菜见习生' };
-      persistIdentity();
-      return identity;
+      return (name || '').trim() ? name.trim().slice(0, 20) : DEFAULT_NICKNAME;
     }
 
-    function persistIdentity() {
-      try { storage.setItem(IDENTITY_KEY, JSON.stringify(identity)); } catch { /* 无法持久化时仅本次会话有效 */ }
+    function persistNickname(nickname) {
+      try { storage.setItem(NICKNAME_KEY, nickname); } catch { /* 无法持久化时仅本次会话有效 */ }
+    }
+
+    async function ensureSession() {
+      const { data: existing } = await client.auth.getSession();
+      if (existing?.session?.user?.id) return existing.session.user;
+      const { data, error } = await client.auth.signInAnonymously();
+      if (error) throw mapAuthError(error);
+      if (!data?.user?.id) throw new Error('未能取得匿名身份，请刷新重试。');
+      return data.user;
+    }
+
+    async function loadProfile() {
+      const { data, error } = await client.from('profiles')
+        .select('id,nickname,qq_number,bound_at').eq('id', me.id).maybeSingle();
+      if (error) {
+        if (isMissingTable(error)) { profilesReady = false; return null; }
+        throw mapError(error);
+      }
+      return data || null;
+    }
+
+    async function createProfile(nickname) {
+      if (!profilesReady) return;
+      const { error } = await client.from('profiles').upsert({ id: me.id, nickname }, { onConflict: 'id' });
+      if (error && !isMissingTable(error)) throw mapError(error);
+    }
+
+    function applyProfile(row) {
+      if (!row) return;
+      me.nickname = row.nickname || me.nickname;
+      me.qqNumber = row.qq_number || null;
+      me.boundAt = row.bound_at || null;
+      persistNickname(me.nickname);
     }
 
     async function fetchQuests() {
@@ -105,39 +171,92 @@
     }
 
     async function syncNickname(nickname) {
-      const me = loadIdentity();
       if (me.nickname === nickname) return;
+      const previous = me.nickname;
       me.nickname = nickname;
-      persistIdentity();
+      persistNickname(nickname);
       const [quests, members] = await Promise.all([
         client.from('quests').update({ owner_nickname: nickname }).eq('owner_id', me.id),
         client.from('quest_members').update({ nickname }).eq('user_id', me.id)
       ]);
-      if (quests.error) throw mapError(quests.error);
+      if (quests.error) { me.nickname = previous; persistNickname(previous); throw mapError(quests.error); }
       if (members.error) throw mapError(members.error);
+      if (profilesReady) {
+        const { error } = await client.from('profiles').update({ nickname }).eq('id', me.id);
+        if (error && !isMissingTable(error)) throw mapError(error);
+      }
     }
 
     return {
       mode: 'supabase',
 
       async init() {
-        loadIdentity();
+        const user = await ensureSession();
+        me.id = user.id;
+        const profile = await loadProfile();
+        if (profile) {
+          applyProfile(profile);
+        } else {
+          me.nickname = storedNickname();
+          await createProfile(me.nickname);
+        }
         await fetchQuests(); // 探活并确认数据表存在，失败时由上层决定是否回退
+        ready = true;
         return this.snapshot();
       },
 
       async snapshot() {
-        const me = loadIdentity();
+        if (!ready) throw new Error('共享服务尚未初始化。');
         const quests = await fetchQuests();
-        return { user: { ...me }, quests: quests.map(decorate) };
+        return {
+          user: { id: me.id, nickname: me.nickname, qqNumber: me.qqNumber, boundAt: me.boundAt },
+          quests: quests.map(decorate)
+        };
       },
 
       async updateNickname(nickname) {
         const name = textField(nickname, '冒险者昵称', 20);
         await syncNickname(name);
-        return { ...loadIdentity() };
+        return { id: me.id, nickname: me.nickname, qqNumber: me.qqNumber, boundAt: me.boundAt };
       },
 
+      /* ---------------------------------------------------- 阶段 1 · 身份绑定 */
+      async createLinkCode() {
+        if (!profilesReady) throw new Error('数据库尚未准备好（缺少 profiles 表），请先执行 supabase/phase1-identity.sql。');
+        // 作废自己未使用的旧码，保证同时只有一个有效码
+        await client.from('link_codes').delete().eq('user_id', me.id).is('consumed_at', null);
+        for (let attempt = 0; attempt < 6; attempt++) {
+          const code = randomCode();
+          const { error } = await client.from('link_codes').insert({ code, user_id: me.id });
+          if (!error) {
+            return { code, expiresAt: new Date(clock() + 10 * 60000).toISOString() };
+          }
+          if (!/duplicate key/i.test(error.message)) throw mapError(error);
+        }
+        throw new Error('生成绑定码失败，请稍后重试。');
+      },
+
+      async bindingStatus() {
+        if (!profilesReady) throw new Error('数据库尚未准备好（缺少 profiles 表），请先执行 supabase/phase1-identity.sql。');
+        const { data: profile, error } = await client.from('profiles')
+          .select('nickname,qq_number,bound_at').eq('id', me.id).maybeSingle();
+        if (error) throw mapError(error);
+        applyProfile(profile);
+        const { data: codes, error: codeError } = await client.from('link_codes')
+          .select('code,expires_at,consumed_at').eq('user_id', me.id).is('consumed_at', null)
+          .gt('expires_at', new Date(clock()).toISOString())
+          .order('created_at', { ascending: false }).limit(1);
+        if (codeError) throw mapError(codeError);
+        const pending = (codes || [])[0] || null;
+        return {
+          qqNumber: me.qqNumber,
+          boundAt: me.boundAt,
+          pendingCode: pending?.code || null,
+          expiresAt: pending?.expires_at || null
+        };
+      },
+
+      /* ------------------------------------------------------------- 委托业务 */
       async createQuest(input) {
         const game = textField(input.game, '游戏名称', 40);
         const nickname = textField(input.nickname, '发布者昵称', 20);
@@ -151,9 +270,8 @@
         if (timestamp <= clock()) throw new Error('开黑时间必须晚于现在（北京时间）。');
 
         await syncNickname(nickname);
-        const me = loadIdentity();
         const row = {
-          id: newId(), game, owner_id: me.id, owner_nickname: me.nickname,
+          id: newQuestId(), game, owner_id: me.id, owner_nickname: me.nickname,
           start_at: new Date(timestamp).toISOString(), created_at: new Date(clock()).toISOString(),
           capacity, voice: input.voice, note, state: 'open', is_demo: false
         };
@@ -173,7 +291,6 @@
       },
 
       async joinQuest(questId) {
-        const me = loadIdentity();
         const quest = await fetchQuest(questId);
         assertOpen(quest);
         if (quest.members.some(member => member.id === me.id)) throw new Error('你已经在这支队伍里啦。');
@@ -183,7 +300,6 @@
       },
 
       async leaveQuest(questId) {
-        const me = loadIdentity();
         const quest = await fetchQuest(questId);
         assertOpen(quest);
         const { error, count } = await client.from('quest_members')
@@ -194,7 +310,6 @@
 
       async finishQuest(questId, nextState) {
         if (!['ended', 'cancelled'].includes(nextState)) throw new Error('无效的委托状态。');
-        const me = loadIdentity();
         const quest = await fetchQuest(questId);
         if (quest.owner.id !== me.id) throw new Error('只有发布者可以管理这份委托。');
         assertOpen(quest);
@@ -210,12 +325,17 @@
 
       async exportData() {
         const quests = await fetchQuests();
-        return JSON.stringify({ version: 1, user: { ...loadIdentity() }, exportedAt: new Date(clock()).toISOString(), quests }, null, 2);
+        return JSON.stringify({
+          version: 1,
+          user: { id: me.id, nickname: me.nickname, qqNumber: me.qqNumber },
+          exportedAt: new Date(clock()).toISOString(),
+          quests
+        }, null, 2);
       }
     };
   }
 
-  const api = { createSupabaseService, IDENTITY_KEY };
+  const api = { createSupabaseService, NICKNAME_KEY };
   root.GuildSupabase = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(globalThis);

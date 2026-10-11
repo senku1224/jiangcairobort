@@ -36,7 +36,11 @@
     const badge = select('.local-badge');
     if (badge) badge.innerHTML = shared ? '<i></i> 共享公会已连接' : '<i></i> 本地演示版';
     const identityNote = select('.sidebar-user small');
-    if (identityNote) identityNote.innerHTML = shared ? '<i class="online-dot"></i> 共享身份 · 未登录' : '<i class="online-dot"></i> 本地演示身份';
+    if (identityNote) identityNote.innerHTML = shared ? '<i class="online-dot"></i> 共享身份 · 已登录' : '<i class="online-dot"></i> 本地演示身份';
+    const profileNote = select('#identity-note');
+    if (profileNote) profileNote.textContent = shared
+      ? '这是你的共享身份（已自动登录，不是账号，换浏览器会变成新的身份）。改昵称会同步更新你的委托与报名。'
+      : '当前使用本地演示身份，尚未接入 QQ 登录。改昵称不会改变身份，也不会丢失你的报名。';
     const footerMode = select('[data-mode-label]');
     if (footerMode) footerMode.textContent = shared ? '共享公会' : '本地演示';
     const nicknameHint = select('#nickname-hint');
@@ -54,6 +58,7 @@
       if (!dialogs.some(item => item.open)) document.body.classList.remove('modal-open');
       if (dialog.id === 'detail-dialog') detailId = null;
       if (dialog.id === 'confirm-dialog') confirmation = null;
+      if (dialog.id === 'profile-dialog') stopBindingPoll();
     });
   });
   function closeDialogs() { dialogs.filter(dialog => dialog.open).forEach(dialog => dialog.close()); }
@@ -189,12 +194,58 @@
     finally { button.disabled = false; }
   }
 
+  /* -------------------------------------------------- 阶段 1 · QQ 绑定（名片内） */
+  let bindingState = null;
+  let bindingTimer = null;
+
+  function renderBinding() {
+    const block = select('#binding-block');
+    if (!block) return;
+    if (backendMode !== 'supabase') { block.hidden = true; return; }
+    block.hidden = false;
+    const state = bindingState || {};
+    if (state.qqNumber) {
+      block.innerHTML = `<div class="binding-head"><strong>已绑定 QQ</strong><span class="binding-ok">✓</span></div><p class="binding-qq">${UI.escape(state.qqNumber)}</p><p class="binding-hint">机器人已经能认出群里的你：以后群内查询、报名都会以这个 QQ 号为准。</p>`;
+      return;
+    }
+    const code = state.pendingCode;
+    block.innerHTML = `<div class="binding-head"><strong>绑定 QQ</strong></div>`
+      + `<p class="binding-hint">${code ? '把下面这个绑定码发给机器人（在群里 @机器人，或私聊它），就能完成绑定。' : '绑定后，机器人才能认出群里的你。绑定码一次性有效。'}</p>`
+      + (code ? `<div class="binding-code">${UI.escape(code)}</div><p class="binding-hint">10 分钟内有效，用一次即失效。</p>` : '')
+      + `<div class="binding-actions">`
+      + `<button type="button" class="button subtle" data-action="bind-generate">${code ? '换一个绑定码' : '生成绑定码'}</button>`
+      + (code ? '<button type="button" class="button subtle" data-action="bind-refresh">我已发送，刷新状态</button>' : '')
+      + `</div>`;
+  }
+
+  async function refreshBinding() {
+    const block = select('#binding-block');
+    if (!block) return;
+    if (backendMode !== 'supabase') { block.hidden = true; return; }
+    try {
+      bindingState = await service.bindingStatus();
+      renderBinding();
+    } catch (error) {
+      block.hidden = false;
+      block.innerHTML = `<div class="binding-head"><strong>绑定 QQ</strong></div><p class="binding-hint">绑定功能暂时不可用：${UI.escape(error.message)}</p>`;
+    }
+  }
+
+  function startBindingPoll() {
+    stopBindingPoll();
+    bindingTimer = setInterval(refreshBinding, 4000);
+  }
+  function stopBindingPoll() {
+    if (bindingTimer) clearInterval(bindingTimer);
+    bindingTimer = null;
+  }
+
   function showInfo(kind) {
     select('#info-title').textContent = kind === 'guide' ? '冒险者指南' : '关于酱菜公会';
     if (kind === 'guide') {
       select('#info-content').innerHTML = '<div class="guide-step"><b>01</b><div><h3>挑一份心动的委托</h3><p>按游戏、日期、状态搜索，确认时间、语音要求与剩余名额。</p></div></div><div class="guide-step"><b>02</b><div><h3>报名，和队友准时碰头</h3><p>点击「报名参加」加入。行程改变时，可以在开场前取消报名；发布者同样可以退出自己的队伍。</p></div></div><div class="guide-step"><b>03</b><div><h3>没有合适的？自己发起！</h3><p>点击「发布冒险委托」，选择预设游戏或输入自定义游戏名。人数是队伍总人数，可选择是否占用一个名额。</p></div></div><div class="identity-note">开场前一小时显示「即将开始」；满员优先显示「已满员」；到开场时间自动结束招募。「已结束」仅表示招募截止，不代表游戏已经结束。</div><p>守时、友善、尊重队友。不会玩没关系，开心最重要。</p>';
     } else if (backendMode === 'supabase') {
-      select('#info-content').innerHTML = '<h3>酱菜多人联机区的温暖据点</h3><p>这是为 QQ 群友准备的 Steam 开黑招募面板。招募与报名已存入共享数据库，群里任何人都能看到同一份公告板。</p><div class="identity-note"><strong>共享数据库已连接（但尚未登录）</strong><p>当前身份只是本浏览器里的随机标识，还没有接入 QQ 登录；同名昵称不等于同一个人，也无法保证「只有本人能修改自己的记录」。</p><p>请不要在委托里填写隐私信息。真正的权限控制要等接入账号身份后才会生效。</p></div><p>未来 QQ 机器人交互将依据实际接口权限实现。</p>';
+      select('#info-content').innerHTML = '<h3>酱菜多人联机区的温暖据点</h3><p>这是为 QQ 群友准备的 Steam 开黑招募面板。招募与报名已存入共享数据库，群里任何人都能看到同一份公告板。</p><div class="identity-note"><strong>共享身份已启用（自动登录）</strong><p>你在这个浏览器里有一个稳定的共享身份，数据库只允许你修改自己发布的委托和自己的报名——别人改不动你的记录。</p><p>它还不是账号：换浏览器或清空数据会变成新身份。想和 QQ 群关联，请在「冒险者名片」里生成绑定码发给机器人。</p></div><p>群里的机器人目前可以查询招募；报名、取消等写操作将在绑定完成后逐步开放。</p>';
     } else {
       select('#info-content').innerHTML = '<h3>酱菜多人联机区的温暖据点</h3><p>这是为 QQ 群友准备的 Steam 开黑招募面板。公会精神很简单：游戏可以输，队友不能丢。</p><div class="identity-note"><strong>当前为本地演示</strong><p>身份和招募只保存在当前浏览器、当前站点。没有接入 QQ 登录、消息通知或共享数据库；同名昵称不等于同一个人。</p><p>清除浏览器数据、更换设备或更换打开地址后，原数据不会自动跟随。请使用页脚「导出数据」保留备份。</p></div><p>多人真实使用需要后端数据库与可靠身份认证。未来 QQ 机器人交互将依据实际接口权限实现。</p>';
     }
@@ -216,6 +267,21 @@
       select('#profile-form').elements.nickname.value = snapshot.user.nickname;
       showError(select('#profile-error'), '');
       openDialog(select('#profile-dialog'));
+      refreshBinding();
+      if (backendMode === 'supabase') startBindingPoll();
+    } else if (action === 'bind-generate') {
+      button.disabled = true;
+      try {
+        await service.createLinkCode();
+        await refreshBinding();
+        toast('绑定码已生成，10 分钟内有效。');
+      } catch (error) { toast(error.message, true); }
+      finally { button.disabled = false; }
+    } else if (action === 'bind-refresh') {
+      button.disabled = true;
+      try { await refreshBinding(); toast('已刷新绑定状态。'); }
+      catch (error) { toast(error.message, true); }
+      finally { button.disabled = false; }
     } else if (action === 'guide' || action === 'about') showInfo(action);
     else if (action === 'detail') {
       detailId = questId;
