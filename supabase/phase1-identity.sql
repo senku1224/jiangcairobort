@@ -17,12 +17,26 @@
 do $$
 declare
   pattern text := '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$';
+  quests_orphan  bigint;
+  members_orphan bigint;
 begin
   if exists (select 1 from public.quests where owner_id !~ pattern) then
     raise exception 'quests.owner_id 中存在非 uuid 的历史数据，请先处理后再执行本脚本。';
   end if;
   if exists (select 1 from public.quest_members where user_id !~ pattern) then
     raise exception 'quest_members.user_id 中存在非 uuid 的历史数据，请先处理后再执行本脚本。';
+  end if;
+
+  -- 存在"没有真实归属"的历史记录时只提示、不中断：下面的外键会用 NOT VALID 添加。
+  select count(*) into quests_orphan
+    from public.quests q
+   where not exists (select 1 from auth.users u where u.id = q.owner_id::uuid);
+  select count(*) into members_orphan
+    from public.quest_members m
+   where not exists (select 1 from auth.users u where u.id = m.user_id::uuid);
+
+  if quests_orphan > 0 or members_orphan > 0 then
+    raise notice '发现 % 条无归属委托、% 条无归属报名（多为此前用旧版网页发布的测试数据）。脚本会继续，但它们无法被任何人管理；想清理见文件末尾「可选清理」。', quests_orphan, members_orphan;
   end if;
 end $$;
 
@@ -69,14 +83,16 @@ alter table public.quests        alter column owner_id type uuid using owner_id:
 alter table public.quest_members alter column user_id  type uuid using user_id::uuid;
 
 -- 关联到 auth.users（用户被删除时，其委托与报名一并清理）
+-- 用 NOT VALID：对"新写入"一律校验，但不因历史遗留的孤立记录而让整个脚本失败。
+-- 想彻底清理孤立记录并把约束变成完全校验态，见文件末尾「可选清理」。
 alter table public.quests        drop constraint if exists quests_owner_fk;
 alter table public.quest_members drop constraint if exists quest_members_user_fk;
 alter table public.quests
   add constraint quests_owner_fk
-  foreign key (owner_id) references auth.users (id) on delete cascade;
+  foreign key (owner_id) references auth.users (id) on delete cascade not valid;
 alter table public.quest_members
   add constraint quest_members_user_fk
-  foreign key (user_id) references auth.users (id) on delete cascade;
+  foreign key (user_id) references auth.users (id) on delete cascade not valid;
 
 -- ============================================================ 3. 触发器
 -- 3.1 报名规则（容量 / 是否已截止）——沿用原有逻辑，重新创建以确保存在
@@ -240,3 +256,20 @@ do $$
 begin
   raise notice '阶段 1 完成：profiles / link_codes / groups 已就绪，归属列已改为 uuid，RLS 已收紧。';
 end $$;
+
+-- ============================================================ 6. 可选：清理"无归属"的历史记录
+-- 本段默认不执行。只有当你确认这些记录（例如更新前用旧版网页发布的测试委托）可以丢弃时，
+-- 才把下面整段取消注释、再运行一次。
+--
+-- 后果：这些委托及其报名会被永久删除，无法恢复；删除后两个外键会被校验为完全有效。
+--
+-- do $$
+-- begin
+--   delete from public.quests q
+--    where not exists (select 1 from auth.users u where u.id = q.owner_id);
+--   delete from public.quest_members m
+--    where not exists (select 1 from auth.users u where u.id = m.user_id);
+--   execute 'alter table public.quests validate constraint quests_owner_fk';
+--   execute 'alter table public.quest_members validate constraint quest_members_user_fk';
+--   raise notice '无归属记录已清理，外键已校验。';
+-- end $$;
