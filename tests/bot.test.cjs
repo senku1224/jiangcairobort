@@ -54,10 +54,93 @@ test('handleCommand 读取失败时给出明确提示', async () => {
   assert.match(result.reply, /读取招募失败/);
 });
 
-test('handleCommand /绑定 与 /报名 不假装已完成', async () => {
-  const deps = { reader: { listOpenQuests: async () => [] }, siteUrl: 'https://example.com/' };
-  assert.match((await handleCommand('绑定 123456', deps, '')).reply, /还没开放/);
-  assert.match((await handleCommand('报名', deps, '')).reply, /需要身份系统/);
+test('未配置写入密钥时 /绑定 /报名 明确说明未启用（不假装成功）', async () => {
+  const deps = { reader: { listOpenQuests: async () => [] }, writer: null, siteUrl: 'https://example.com/' };
+  assert.match((await handleCommand('绑定 123456', deps, '', { qq: '10001' })).reply, /写入密钥/);
+  assert.match((await handleCommand('报名 1', deps, '', { qq: '10001' })).reply, /写入密钥/);
+});
+
+test('/绑定 无参数时给出用法', async () => {
+  const deps = { reader: {}, writer: {}, siteUrl: 'https://example.com/' };
+  assert.match((await handleCommand('绑定', deps, '', { qq: '10001' })).reply, /用法/);
+});
+
+test('/绑定 成功时确认绑定到该 QQ', async () => {
+  const deps = {
+    reader: {}, siteUrl: 'https://example.com/',
+    writer: { bindByCode: async () => ({ ok: true, nickname: '阿七' }) }
+  };
+  const result = await handleCommand('绑定 123456', deps, '', { qq: '10001' });
+  assert.match(result.reply, /绑定成功/);
+  assert.match(result.reply, /10001/);
+});
+
+test('/绑定 失败时回传原因', async () => {
+  const deps = {
+    reader: {}, siteUrl: '',
+    writer: { bindByCode: async () => ({ ok: false, reason: '绑定码无效、已过期或已被使用' }) }
+  };
+  assert.match((await handleCommand('绑定 000000', deps, '', { qq: '1' })).reply, /绑定码无效/);
+});
+
+test('/报名 未绑定时提示先绑定', async () => {
+  const deps = {
+    reader: { listOpenQuests: async () => [] }, siteUrl: '',
+    writer: { resolveByQq: async () => null }
+  };
+  assert.match((await handleCommand('报名 1', deps, '', { qq: '10001' })).reply, /还没有绑定/);
+});
+
+test('/报名 按序号报名成功并带上身份与昵称', async () => {
+  let joined = null;
+  const deps = {
+    reader: { listOpenQuests: async () => ([{ id: 'q1', game: '双人成行', start_at: '2026-12-01T12:00:00Z', capacity: 2, remaining: 1 }]) },
+    siteUrl: '',
+    writer: {
+      resolveByQq: async () => ({ uid: 'u1', nickname: '阿七' }),
+      joinQuest: async (id, uid, nickname) => { joined = { id, uid, nickname }; return { ok: true }; }
+    }
+  };
+  const result = await handleCommand('报名 1', deps, '', { qq: '10001' });
+  assert.match(result.reply, /报名成功/);
+  assert.deepEqual(joined, { id: 'q1', uid: 'u1', nickname: '阿七' });
+});
+
+test('/报名 序号越界时提示先看列表', async () => {
+  const deps = {
+    reader: { listOpenQuests: async () => [] }, siteUrl: '',
+    writer: { resolveByQq: async () => ({ uid: 'u1', nickname: '阿七' }) }
+  };
+  assert.match((await handleCommand('报名 9', deps, '', { qq: '1' })).reply, /没有找到第 9/);
+});
+
+test('/取消 未报名时提示无需取消', async () => {
+  const deps = {
+    reader: { listOpenQuests: async () => ([{ id: 'q1', game: '胡闹厨房', start_at: '2026-12-01T12:00:00Z' }]) },
+    siteUrl: '',
+    writer: {
+      resolveByQq: async () => ({ uid: 'u1', nickname: '阿七' }),
+      leaveQuest: async () => ({ ok: true, removed: 0 })
+    }
+  };
+  assert.match((await handleCommand('取消 1', deps, '', { qq: '1' })).reply, /无需取消/);
+});
+
+test('/我的 汇总发布与报名', async () => {
+  const deps = {
+    reader: {}, siteUrl: 'https://example.com/',
+    writer: {
+      resolveByQq: async () => ({ uid: 'u1', nickname: '阿七' }),
+      myQuests: async () => ({
+        owned: [{ id: 'q1', game: '我发布的', start_at: '2026-12-01T12:00:00Z', state: 'open' }],
+        joined: [{ id: 'q2', game: '我报名的', start_at: '2026-12-02T12:00:00Z', state: 'open' }]
+      })
+    }
+  };
+  const result = await handleCommand('我的', deps, '', { qq: '1' });
+  assert.match(result.reply, /我发布的/);
+  assert.match(result.reply, /我报名的/);
+  assert.match(result.reply, /https:\/\/example\.com\//);
 });
 
 test('handleCommand /招募 在缓存兜底时标注数据可能不是最新', async () => {
