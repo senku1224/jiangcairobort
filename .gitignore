@@ -1,3 +1,5 @@
 node_modules/
 test-results/
 *.log
+bot/.env
+bot/data/

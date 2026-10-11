@@ -5,9 +5,10 @@
   "description": "酱菜冒险者公会 · Steam 游戏开黑招募系统",
   "scripts": {
     "start": "node server.cjs",
+    "bot": "node bot/index.cjs",
     "test": "node --test tests/*.test.cjs",
     "test:browser": "node tests/browser.cjs",
-    "check": "node --check js/config.js && node --check js/data.js && node --check js/supabase-store.js && node --check js/backend.js && node --check js/ui.js && node --check js/app.js && node --check server.cjs"
+    "check": "node --check js/config.js && node --check js/data.js && node --check js/supabase-store.js && node --check js/backend.js && node --check js/ui.js && node --check js/app.js && node --check server.cjs && node --check bot/config.cjs && node --check bot/onebot.cjs && node --check bot/supabase-rest.cjs && node --check bot/commands.cjs && node --check bot/index.cjs"
   },
   "engines": { "node": ">=18" }
 }

@@ -195,3 +195,16 @@
 - 后端用 **Supabase Edge Functions** 还是 **自建 Node 服务**（推荐后者，机器人需要常驻）？
 - 有没有一台**常开服务器** + 一个可用的 **QQ 号（建议小号）**？
 - 网站域名是否已**备案**（决定将来能否走官方 QQ 登录）？
+
+## 12. 已确定的决策（2026-10-11）
+
+| 事项 | 结论 |
+| --- | --- |
+| 机器人路线 | **NapCat（OneBot v11）**，先跑通只读；业务写成适配层，将来可切官方 |
+| 后端形态 | **自建 Node 服务**，零依赖，跑在**用户本机**（非课题组 GPU 服务器） |
+| 机器人 QQ 号 | 3931105615（建议确认是否为小号） |
+| 通信方式 | NapCat「HTTP 上报」→ 本机 `127.0.0.1:8790/onebot`；本机调用 NapCat「HTTP API」发消息 |
+| 网站托管 | **GitHub Pages**：https://senku1224.github.io/jiangcairobort/ （已上线，公开地址） |
+| 数据库 | 仍为 Supabase；当前只读阶段机器人只用 publishable key，无需 service key |
+
+机器人骨架代码见 `bot/`（`npm run bot`）。阶段 1（身份地基）尚未开始，需在 Supabase 侧执行新的 SQL 并接入匿名登录。
