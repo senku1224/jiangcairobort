@@ -11,7 +11,7 @@
 const { config, isGroupAllowed } = require('./config.cjs');
 const { startEventServer, reply, replyPrivate, extractText, isMentioned, stripPlainMention, log } = require('./onebot.cjs');
 const { createReader, createWriter } = require('./supabase-rest.cjs');
-const { handleCommand } = require('./commands.cjs');
+const { handleCommand, parseCommand, looksLikeCode } = require('./commands.cjs');
 
 const reader = createReader(config.supabaseUrl, config.supabaseKey, { proxy: config.httpProxy, retries: 4 });
 const writer = config.supabaseServiceKey
@@ -37,9 +37,15 @@ async function onEvent(event) {
   const isGroup = event.message_type === 'group';
   const mentioned = isMentioned(event, event.self_id) || /^@/.test(raw);
   const slashy = /^[\/／]/.test(text) || (config.commandPrefix && text.startsWith(config.commandPrefix));
+  // 有些情况拿不到 @ 消息段：手打的「@昵称」、或 @ 到了群里另一个机器人。
+  // 只要文本本身就是「明确要机器人做事」的指令（带参数的绑定/报名/取消，或一个 6 位绑定码），
+  // 也照常响应，避免指令被静默丢掉、群里像没反应一样。
+  const peek = parseCommand(text, config.commandPrefix);
+  const bareCode = looksLikeCode(stripTriggers(text));
+  const explicit = bareCode || !!(peek && ['bind', 'join', 'leave'].includes(peek.name) && peek.args.length > 0);
   if (isGroup) {
     if (!isGroupAllowed(event.group_id)) return;
-    if (!mentioned && !slashy) return;
+    if (!mentioned && !slashy && !explicit) return;
   }
   // 私聊：允许直接发「招募」「绑定 123456」这类松散写法；
   // 认不出的内容不会回复（下面的提示只在被 @ 或带 / 时触发）。
@@ -50,8 +56,10 @@ async function onEvent(event) {
     qq: event.user_id ? String(event.user_id) : '',
     nickname: (event.sender && (event.sender.card || event.sender.nickname)) || '',
     isGroup,
-    mentioned
+    mentioned,
+    bareCode
   };
+  log(`收到 ${isGroup ? `群 ${event.group_id}` : `私聊 ${event.user_id}`}｜QQ ${context.qq || '?'}：${raw}`);
   const result = await handleCommand(content, deps, config.commandPrefix, context);
   let answer = result.handled ? result.reply : '';
   if (!answer && result.unknown && (mentioned || slashy)) {

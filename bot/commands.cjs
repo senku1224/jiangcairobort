@@ -136,7 +136,7 @@ function formatMine(mine, siteUrl) {
 async function handleCommand(text, deps, prefix, context = {}) {
   let parsed = parseCommand(text, prefix);
   // 只 @了机器人、后面直接跟 6 位码：也当成 /绑定（很多人会这么发）
-  if (parsed && parsed.name === 'unknown' && context.mentioned && looksLikeCode(parsed.raw)) {
+  if (parsed && parsed.name === 'unknown' && (context.mentioned || context.bareCode) && looksLikeCode(parsed.raw)) {
     parsed = { name: 'bind', args: [String(parsed.raw).trim()], raw: parsed.raw };
   }
   if (!parsed) return { handled: false };

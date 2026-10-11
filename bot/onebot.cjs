@@ -8,6 +8,10 @@
 'use strict';
 
 const http = require('node:http');
+const fs = require('node:fs');
+const path = require('node:path');
+
+const LOG_PATH = path.join(__dirname, 'data', 'bot.log');
 
 function startEventServer(options, onEvent) {
   const server = http.createServer((request, response) => {
@@ -79,7 +83,14 @@ function stripPlainMention(text) {
 
 function log(message) {
   const stamp = new Date().toLocaleString('zh-CN', { hour12: false });
-  console.log(`[${stamp}] ${message}`);
+  const line = `[${stamp}] ${message}`;
+  console.log(line);
+  // 同时落盘，方便排查「到底有没有收到消息」这类问题（bot/data/bot.log）。
+  try {
+    fs.mkdirSync(path.dirname(LOG_PATH), { recursive: true });
+    if (fs.existsSync(LOG_PATH) && fs.statSync(LOG_PATH).size > 512 * 1024) fs.writeFileSync(LOG_PATH, '');
+    fs.appendFileSync(LOG_PATH, line + '\n');
+  } catch { /* 写日志失败不影响主流程 */ }
 }
 
 module.exports = { startEventServer, callApi, reply, replyPrivate, extractText, isMentioned, stripPlainMention, log };
